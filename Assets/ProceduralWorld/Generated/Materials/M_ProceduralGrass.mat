@@ -65,10 +65,10 @@ Material:
     - _Cutoff: 0.5
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
-    - _FoliageGlow: 0.24
-    - _FrostAmount: 0
+    - _FoliageGlow: 0.18
+    - _FrostAmount: 0.68
     - _GlossMapScale: 1
-    - _Glossiness: 0.05
+    - _Glossiness: 0.16
     - _GlossyReflections: 1
     - _Metallic: 0
     - _Mode: 0
@@ -83,7 +83,7 @@ Material:
     - _WindSpeed: 1.05
     - _ZWrite: 1
     m_Colors:
-    - _Color: {r: 0.31, g: 0.48, b: 0.19, a: 1}
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _FrostTint: {r: 0.78, g: 0.88, b: 0.95, a: 1}
   m_BuildTextureStacks: []

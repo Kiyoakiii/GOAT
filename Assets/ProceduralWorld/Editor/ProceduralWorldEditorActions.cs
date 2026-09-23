@@ -16,12 +16,22 @@ namespace GoatDescent.ProceduralWorld.Editor
     {
         public const string SettingsPath = "Assets/ProceduralWorld/Data/WorldSettings_Prototype.asset";
         public const string ScenePath = "Assets/ProceduralWorld/Scenes/ProceduralWorldMilestone.unity";
+        private const string GroundcoverPreviewScenePath = "Assets/ProceduralWorld/Scenes/ProceduralWorldGroundcoverPreview.unity";
         private const string TerrainDataPath = "Assets/ProceduralWorld/Generated/Terrain/ProceduralWorldTerrainData.asset";
         private const string MaterialRoot = "Assets/ProceduralWorld/Generated/Materials";
         private const string DebugRoot = "Assets/ProceduralWorld/Generated/Debug";
         private const string GrassRoot = "Assets/ProceduralWorld/Generated/Grass";
         private const string GrassMeshPath = GrassRoot + "/GrassClump.asset";
         private const string GrassPrefabPath = GrassRoot + "/GrassClump.prefab";
+        private static readonly string[] GroundcoverMeshNames = { "MeadowGrass", "AlpineBloom", "MountainHeather", "FrostJuniper", "AlpineBerryShrub" };
+        private static readonly string[] GroundcoverMeshPaths =
+        {
+            GrassMeshPath,
+            GrassRoot + "/AlpineBloom.asset",
+            GrassRoot + "/MountainHeather.asset",
+            GrassRoot + "/FrostJuniper.asset",
+            GrassRoot + "/AlpineBerryShrub.asset"
+        };
         private const float FbxUnitCompensation = 100f;
 
         private static readonly string[] RockPaths =
@@ -62,6 +72,18 @@ namespace GoatDescent.ProceduralWorld.Editor
         public static void GenerateWorldFromMenu()
         {
             GenerateWorld(GetOrCreateSettings());
+        }
+
+        [MenuItem("Tools/Procedural World/Generate Groundcover Preview (Safe)")]
+        public static void GenerateGroundcoverPreviewFromMenu()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                Debug.LogWarning("Groundcover preview was not generated. Stop Play Mode first; the active scene will remain untouched.");
+                return;
+            }
+
+            GenerateWorld(GetOrCreateSettings(), GroundcoverPreviewScenePath, false);
         }
 
         [MenuItem("Tools/Procedural World/Regenerate Terrain")]
@@ -122,8 +144,15 @@ namespace GoatDescent.ProceduralWorld.Editor
 
         public static void GenerateWorld(WorldSettings settings)
         {
+            GenerateWorld(settings, ScenePath, true);
+        }
+
+        private static void GenerateWorld(WorldSettings settings, string outputScenePath, bool includeInBuildSettings)
+        {
             if (settings == null)
                 throw new ArgumentNullException(nameof(settings));
+            if (string.IsNullOrEmpty(outputScenePath))
+                throw new ArgumentException("An output scene path is required.", nameof(outputScenePath));
             EnsureFolders();
             AssetDatabase.Refresh();
             var stopwatch = Stopwatch.StartNew();
@@ -166,11 +195,12 @@ namespace GoatDescent.ProceduralWorld.Editor
                 CreateLighting(worldRoot.transform, previewScene);
                 CreateCaptureCameras(worldRoot.transform, previewScene, terrain, terrainResult, grassDensityMap, settings);
                 GenerateDebugTextures(settings, terrainResult);
-                EditorSceneManager.SaveScene(previewScene, ScenePath);
-                EnsureSceneInBuildSettings(ScenePath);
+                EditorSceneManager.SaveScene(previewScene, outputScenePath);
+                if (includeInBuildSettings)
+                    EnsureSceneInBuildSettings(outputScenePath);
                 AssetDatabase.SaveAssets();
                 stopwatch.Stop();
-                Debug.Log($"PROCEDURAL_WORLD_MILESTONE_OK seed={settings.seed} terrain={settings.worldSize:F0}m chunks={chunks.Count} scene={ScenePath} ms={stopwatch.ElapsedMilliseconds} screenshots={GetScreenshotRoot()}");
+                Debug.Log($"PROCEDURAL_WORLD_MILESTONE_OK seed={settings.seed} terrain={settings.worldSize:F0}m chunks={chunks.Count} scene={outputScenePath} buildScene={includeInBuildSettings} ms={stopwatch.ElapsedMilliseconds} screenshots={GetScreenshotRoot()}");
             }
             finally
             {
@@ -251,7 +281,7 @@ namespace GoatDescent.ProceduralWorld.Editor
                 float biomeMultiplier = sample.biome == BiomeKind.Forest ? 0.62f : 1f;
                 float slopeMultiplier = 1f - NoiseGenerator.SmoothMask(slope, settings.grassSlopeLimit * 0.55f, settings.grassSlopeLimit);
                 float density = settings.grassDensity * patch * biomeMultiplier * slopeMultiplier * (1f - sample.snowMask);
-                densityMap[z, x] = Mathf.Clamp(Mathf.RoundToInt(density * 14f), 0, 24);
+                densityMap[z, x] = Mathf.Clamp(Mathf.RoundToInt(density * 12f), 0, 22);
                 grassClumpCount += densityMap[z, x];
             }
             Debug.Log($"PROCEDURAL_WORLD_GRASS_OK clumps={grassClumpCount} detailResolution={detailResolution} seed={settings.seed}");
@@ -260,10 +290,13 @@ namespace GoatDescent.ProceduralWorld.Editor
 
         private static void CreateGrassMeshes(Transform root, Scene scene, Terrain terrain, int[,] densityMap, TerrainBuildResult result, WorldSettings settings)
         {
-            Mesh grassMesh = GetOrCreateGrassMeshAsset();
+            var grassMeshes = new Mesh[GroundcoverMeshPaths.Length];
+            for (int i = 0; i < grassMeshes.Length; i++)
+                grassMeshes[i] = GetOrCreateGroundcoverMesh(i);
             Material grassMaterial = GetOrCreateGrassMaterial();
             int detailResolution = densityMap.GetLength(0);
-            int chunkCount = Mathf.CeilToInt(settings.worldSize / settings.chunkSize);
+            float groundcoverChunkSize = Mathf.Min(settings.chunkSize, 128f);
+            int chunkCount = Mathf.CeilToInt(settings.worldSize / groundcoverChunkSize);
             int[] clumpsPerChunk = new int[chunkCount * chunkCount];
             float cellSize = settings.worldSize / detailResolution;
             for (int z = 0; z < detailResolution; z++)
@@ -272,8 +305,8 @@ namespace GoatDescent.ProceduralWorld.Editor
                 int count = densityMap[z, x];
                 if (count <= 0)
                     continue;
-                int chunkX = Mathf.Min(Mathf.FloorToInt((x + 0.5f) * cellSize / settings.chunkSize), chunkCount - 1);
-                int chunkZ = Mathf.Min(Mathf.FloorToInt((z + 0.5f) * cellSize / settings.chunkSize), chunkCount - 1);
+                int chunkX = Mathf.Min(Mathf.FloorToInt((x + 0.5f) * cellSize / groundcoverChunkSize), chunkCount - 1);
+                int chunkZ = Mathf.Min(Mathf.FloorToInt((z + 0.5f) * cellSize / groundcoverChunkSize), chunkCount - 1);
                 clumpsPerChunk[chunkZ * chunkCount + chunkX] += count;
             }
 
@@ -284,6 +317,7 @@ namespace GoatDescent.ProceduralWorld.Editor
             var random = new System.Random(settings.seed ^ 0x2C9277B5);
             TerrainData terrainData = terrain.terrainData;
             int sourceResolution = result.heights.GetLength(0);
+            var speciesCounts = new int[grassMeshes.Length];
             for (int z = 0; z < detailResolution; z++)
             for (int x = 0; x < detailResolution; x++)
             {
@@ -293,10 +327,15 @@ namespace GoatDescent.ProceduralWorld.Editor
 
                 float cellStartX = x * cellSize;
                 float cellStartZ = z * cellSize;
+                Vector2 clusterCenter = Vector2.zero;
                 for (int i = 0; i < count; i++)
                 {
-                    float worldX = cellStartX + (float)random.NextDouble() * cellSize;
-                    float worldZ = cellStartZ + (float)random.NextDouble() * cellSize;
+                    if (i % 3 == 0)
+                        clusterCenter = new Vector2(cellStartX + (float)random.NextDouble() * cellSize, cellStartZ + (float)random.NextDouble() * cellSize);
+                    float clusterAngle = (float)random.NextDouble() * Mathf.PI * 2f;
+                    float clusterRadius = Mathf.Sqrt((float)random.NextDouble()) * 0.48f;
+                    float worldX = Mathf.Clamp(clusterCenter.x + Mathf.Cos(clusterAngle) * clusterRadius, 0f, settings.worldSize - 0.001f);
+                    float worldZ = Mathf.Clamp(clusterCenter.y + Mathf.Sin(clusterAngle) * clusterRadius, 0f, settings.worldSize - 0.001f);
                     float u = worldX / settings.worldSize;
                     float v = worldZ / settings.worldSize;
                     int sx = Mathf.Clamp(Mathf.RoundToInt(u * (sourceResolution - 1)), 0, sourceResolution - 1);
@@ -305,20 +344,22 @@ namespace GoatDescent.ProceduralWorld.Editor
                     if (!WorldPlacementRules.AllowsGrass(sample, result.slopes[sz, sx], settings))
                         continue;
 
-                    int chunkX = Mathf.Min(Mathf.FloorToInt(worldX / settings.chunkSize), chunkCount - 1);
-                    int chunkZ = Mathf.Min(Mathf.FloorToInt(worldZ / settings.chunkSize), chunkCount - 1);
+                    int chunkX = Mathf.Min(Mathf.FloorToInt(worldX / groundcoverChunkSize), chunkCount - 1);
+                    int chunkZ = Mathf.Min(Mathf.FloorToInt(worldZ / groundcoverChunkSize), chunkCount - 1);
                     int chunkIndex = chunkZ * chunkCount + chunkX;
                     var localPosition = new Vector3(
-                        worldX - chunkX * settings.chunkSize,
+                        worldX - chunkX * groundcoverChunkSize,
                         terrainData.GetInterpolatedHeight(u, v) + 0.015f,
-                        worldZ - chunkZ * settings.chunkSize);
-                    float scale = Mathf.Lerp(0.80f, 1.25f, (float)random.NextDouble());
+                        worldZ - chunkZ * groundcoverChunkSize);
+                    float scale = Mathf.Lerp(0.84f, 1.18f, (float)random.NextDouble());
+                    int species = SelectGroundcoverVariant(sample, random);
                     var combine = new CombineInstance
                     {
-                        mesh = grassMesh,
+                        mesh = grassMeshes[species],
                         transform = Matrix4x4.TRS(localPosition, Quaternion.Euler(0f, (float)random.NextDouble() * 360f, 0f), Vector3.one * scale)
                     };
                     instancesByChunk[chunkIndex].Add(combine);
+                    speciesCounts[species]++;
                 }
             }
 
@@ -330,6 +371,8 @@ namespace GoatDescent.ProceduralWorld.Editor
                 int index = z * chunkCount + x;
                 string assetPath = $"{GrassRoot}/GrassChunk_{x}_{z}.asset";
                 Mesh chunkMesh = AssetDatabase.LoadAssetAtPath<Mesh>(assetPath);
+                if (chunkMesh == null && instancesByChunk[index].Count == 0)
+                    continue;
                 if (chunkMesh == null)
                 {
                     chunkMesh = new Mesh { name = $"GrassChunk_{x}_{z}" };
@@ -337,16 +380,22 @@ namespace GoatDescent.ProceduralWorld.Editor
                 }
 
                 chunkMesh.Clear();
-                chunkMesh.indexFormat = IndexFormat.UInt32;
+                int estimatedVertexCount = 0;
+                for (int instance = 0; instance < instancesByChunk[index].Count; instance++)
+                    estimatedVertexCount += instancesByChunk[index][instance].mesh.vertexCount;
+                chunkMesh.indexFormat = estimatedVertexCount > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16;
                 if (instancesByChunk[index].Count > 0)
+                {
                     chunkMesh.CombineMeshes(instancesByChunk[index].ToArray(), true, true, false);
+                    MeshUtility.SetMeshCompression(chunkMesh, ModelImporterMeshCompression.Medium);
+                }
                 chunkMesh.RecalculateBounds();
                 EditorUtility.SetDirty(chunkMesh);
 
                 if (instancesByChunk[index].Count == 0)
                     continue;
                 var grassChunk = CreateChild($"Grass Patch ({x}, {z})", root, scene);
-                grassChunk.transform.position = new Vector3(x * settings.chunkSize, 0f, z * settings.chunkSize);
+                grassChunk.transform.position = new Vector3(x * groundcoverChunkSize, 0f, z * groundcoverChunkSize);
                 grassChunk.AddComponent<MeshFilter>().sharedMesh = chunkMesh;
                 MeshRenderer renderer = grassChunk.AddComponent<MeshRenderer>();
                 renderer.sharedMaterial = grassMaterial;
@@ -356,7 +405,7 @@ namespace GoatDescent.ProceduralWorld.Editor
                 totalClumps += instancesByChunk[index].Count;
                 totalTriangles += (int)(chunkMesh.GetIndexCount(0) / 3);
             }
-            Debug.Log($"PROCEDURAL_WORLD_GRASS_MESHES_OK chunks={chunkCount * chunkCount} clumps={totalClumps} triangles={totalTriangles} seed={settings.seed}");
+            Debug.Log($"PROCEDURAL_WORLD_GROUNDCOVER_OK patches={chunkCount * chunkCount} patchSize={groundcoverChunkSize:F0}m plants={totalClumps} triangles={totalTriangles} meshCompression=Medium vertexColors=Color32 meadowGrass={speciesCounts[0]} alpineBloom={speciesCounts[1]} mountainHeather={speciesCounts[2]} frostJuniper={speciesCounts[3]} alpineBerryShrub={speciesCounts[4]} renderersPerVisiblePatch=1 shadowCasting=Off seed={settings.seed}");
         }
 
         private static GameObject GetOrCreateGrassPrefab()
@@ -399,19 +448,27 @@ namespace GoatDescent.ProceduralWorld.Editor
 
         private static Mesh GetOrCreateGrassMeshAsset()
         {
+            return GetOrCreateGroundcoverMesh(0);
+        }
+
+        private static Mesh GetOrCreateGroundcoverMesh(int variantIndex)
+        {
             EnsureFolder(GrassRoot);
-            Mesh mesh = AssetDatabase.LoadAssetAtPath<Mesh>(GrassMeshPath);
-            Mesh regenerated = CreateGrassClumpMesh();
+            string assetPath = GroundcoverMeshPaths[variantIndex];
+            Mesh mesh = AssetDatabase.LoadAssetAtPath<Mesh>(assetPath);
+            Mesh regenerated = CreateGroundcoverMesh(variantIndex);
             if (mesh == null)
             {
                 mesh = regenerated;
-                AssetDatabase.CreateAsset(mesh, GrassMeshPath);
+                AssetDatabase.CreateAsset(mesh, assetPath);
             }
             else
             {
                 mesh.Clear();
+                mesh.indexFormat = regenerated.indexFormat;
                 mesh.SetVertices(regenerated.vertices);
                 mesh.SetNormals(regenerated.normals);
+                mesh.SetColors(regenerated.colors32);
                 mesh.SetTriangles(regenerated.triangles, 0);
                 mesh.RecalculateBounds();
                 UnityEngine.Object.DestroyImmediate(regenerated);
@@ -435,33 +492,247 @@ namespace GoatDescent.ProceduralWorld.Editor
             renderer.receiveShadows = false;
         }
 
-        private static Mesh CreateGrassClumpMesh()
+        private static Mesh CreateGroundcoverMesh(int variantIndex)
         {
-            var vertices = new List<Vector3>(60);
-            var normals = new List<Vector3>(60);
-            var triangles = new List<int>(60);
-            var random = new System.Random(847291);
-            const int bladeCount = 8;
-            for (int i = 0; i < bladeCount; i++)
+            var vertices = new List<Vector3>(72);
+            var normals = new List<Vector3>(72);
+            var colors = new List<Color32>(72);
+            var triangles = new List<int>(108);
+            var random = new System.Random(847291 + variantIndex * 1297);
+
+            switch (variantIndex)
             {
-                float angle = i * Mathf.PI * 2f / bladeCount + (float)random.NextDouble() * 0.35f;
-                Vector3 direction = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
-                Vector3 side = new Vector3(-direction.z, 0f, direction.x) * Mathf.Lerp(0.10f, 0.16f, (float)random.NextDouble());
-                Vector3 basePoint = direction * Mathf.Lerp(0f, 0.13f, (float)random.NextDouble());
-                Vector3 tip = basePoint + direction * Mathf.Lerp(0.18f, 0.48f, (float)random.NextDouble())
-                    + Vector3.up * Mathf.Lerp(0.58f, 0.94f, (float)random.NextDouble());
-                AddGrassBlade(vertices, normals, triangles, basePoint - side, basePoint + side, tip);
+                case 0:
+                    CreateMeadowGrass(vertices, normals, colors, triangles, random);
+                    break;
+                case 1:
+                    CreateAlpineBloom(vertices, normals, colors, triangles, random);
+                    break;
+                case 2:
+                    CreateMountainHeather(vertices, normals, colors, triangles, random);
+                    break;
+                case 3:
+                    CreateFrostJuniper(vertices, normals, colors, triangles, random);
+                    break;
+                default:
+                    CreateAlpineBerryShrub(vertices, normals, colors, triangles, random);
+                    break;
             }
 
-            var mesh = new Mesh { name = "GrassClump" };
+            var mesh = new Mesh { name = GroundcoverMeshNames[variantIndex] };
             mesh.SetVertices(vertices);
             mesh.SetNormals(normals);
+            mesh.SetColors(colors);
             mesh.SetTriangles(triangles, 0);
             mesh.RecalculateBounds();
             return mesh;
         }
 
-        private static void AddGrassBlade(List<Vector3> vertices, List<Vector3> normals, List<int> triangles, Vector3 left, Vector3 right, Vector3 tip)
+        private static void CreateMeadowGrass(List<Vector3> vertices, List<Vector3> normals, List<Color32> colors, List<int> triangles, System.Random random)
+        {
+            const int bladeCount = 6;
+            Color baseColor = new Color(0.47f, 0.66f, 0.31f, 0f);
+            Color tipColor = new Color(0.78f, 0.88f, 0.43f, 0.05f);
+            for (int i = 0; i < bladeCount; i++)
+            {
+                float angle = i * Mathf.PI * 2f / bladeCount + (float)random.NextDouble() * 0.42f;
+                Vector3 direction = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+                Vector3 side = new Vector3(-direction.z, 0f, direction.x) * Mathf.Lerp(0.035f, 0.065f, (float)random.NextDouble());
+                Vector3 basePoint = direction * Mathf.Lerp(0f, 0.12f, (float)random.NextDouble());
+                Vector3 tip = basePoint + direction * Mathf.Lerp(0.14f, 0.34f, (float)random.NextDouble())
+                    + Vector3.up * Mathf.Lerp(0.48f, 0.83f, (float)random.NextDouble());
+                AddFoliageLeaf(vertices, normals, colors, triangles, basePoint - side, basePoint + side, tip, baseColor, tipColor);
+            }
+        }
+
+        private static void CreateAlpineBloom(List<Vector3> vertices, List<Vector3> normals, List<Color32> colors, List<int> triangles, System.Random random)
+        {
+            Color leafBase = new Color(0.44f, 0.64f, 0.41f, 0f);
+            Color leafTip = new Color(0.70f, 0.82f, 0.50f, 0.12f);
+            const int leafCount = 4;
+            for (int i = 0; i < leafCount; i++)
+            {
+                float angle = i * Mathf.PI * 2f / leafCount + (float)random.NextDouble() * 0.28f;
+                Vector3 direction = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+                Vector3 side = new Vector3(-direction.z, 0f, direction.x) * Mathf.Lerp(0.055f, 0.085f, (float)random.NextDouble());
+                Vector3 basePoint = direction * 0.025f + Vector3.up * 0.025f;
+                Vector3 tip = basePoint + direction * Mathf.Lerp(0.12f, 0.22f, (float)random.NextDouble())
+                    + Vector3.up * Mathf.Lerp(0.22f, 0.34f, (float)random.NextDouble());
+                AddFoliageLeaf(vertices, normals, colors, triangles, basePoint - side, basePoint + side, tip, leafBase, leafTip);
+            }
+
+            float flowerAngle = (float)random.NextDouble() * Mathf.PI * 2f;
+            Vector3 flowerDirection = new Vector3(Mathf.Cos(flowerAngle), 0f, Mathf.Sin(flowerAngle));
+            Vector3 stemTip = flowerDirection * 0.055f + Vector3.up * Mathf.Lerp(0.43f, 0.56f, (float)random.NextDouble());
+            Vector3 stemSide = new Vector3(-flowerDirection.z, 0f, flowerDirection.x) * 0.012f;
+            AddFoliageLeaf(vertices, normals, colors, triangles, -stemSide, stemSide, stemTip,
+                new Color(0.38f, 0.60f, 0.32f, 0f), new Color(0.60f, 0.78f, 0.40f, 0.08f));
+            double bloomRoll = random.NextDouble();
+            Color bloomColor = bloomRoll < 0.34d
+                ? new Color(0.88f, 0.47f, 0.66f, 0f)
+                : bloomRoll < 0.68d
+                    ? new Color(0.71f, 0.60f, 0.91f, 0f)
+                    : new Color(0.96f, 0.74f, 0.34f, 0f);
+            AddFlowerHead(vertices, normals, colors, triangles, stemTip, bloomColor);
+        }
+
+        private static void CreateMountainHeather(List<Vector3> vertices, List<Vector3> normals, List<Color32> colors, List<int> triangles, System.Random random)
+        {
+            Color leafBase = new Color(0.47f, 0.60f, 0.37f, 0.03f);
+            Color leafTip = new Color(0.78f, 0.77f, 0.44f, 0.18f);
+            const int sprayCount = 5;
+            for (int i = 0; i < sprayCount; i++)
+            {
+                float angle = i * Mathf.PI * 2f / sprayCount + (float)random.NextDouble() * 0.34f;
+                Vector3 direction = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+                Vector3 tangent = new Vector3(-direction.z, 0f, direction.x);
+                Vector3 basePoint = direction * 0.08f + Vector3.up * 0.045f;
+                Vector3 tip = basePoint + direction * Mathf.Lerp(0.28f, 0.43f, (float)random.NextDouble())
+                    + Vector3.up * Mathf.Lerp(0.22f, 0.38f, (float)random.NextDouble());
+                Vector3 side = tangent * Mathf.Lerp(0.075f, 0.11f, (float)random.NextDouble());
+                AddFoliageLeaf(vertices, normals, colors, triangles, basePoint - side, basePoint + side, tip, leafBase, leafTip);
+            }
+
+            // A few muted berry-like leaves break the green silhouette without adding renderers.
+            for (int i = 0; i < 3; i++)
+            {
+                float angle = i * Mathf.PI * 2f / 3f + 0.4f;
+                Vector3 center = new Vector3(Mathf.Cos(angle) * 0.34f, 0.24f + i * 0.025f, Mathf.Sin(angle) * 0.34f);
+                Vector3 side = new Vector3(0.034f, 0f, 0.026f);
+                AddFoliageLeaf(vertices, normals, colors, triangles, center - side, center + side,
+                    center + Vector3.up * 0.065f, new Color(0.71f, 0.43f, 0.46f, 0f), new Color(0.82f, 0.56f, 0.49f, 0.04f));
+            }
+        }
+
+        private static void CreateFrostJuniper(List<Vector3> vertices, List<Vector3> normals, List<Color32> colors, List<int> triangles, System.Random random)
+        {
+            Color leafBase = new Color(0.39f, 0.60f, 0.58f, 0.22f);
+            Color leafTip = new Color(0.81f, 0.91f, 0.91f, 0.88f);
+            const int branchCount = 6;
+            for (int i = 0; i < branchCount; i++)
+            {
+                float angle = i * Mathf.PI * 2f / branchCount + (float)random.NextDouble() * 0.3f;
+                Vector3 direction = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+                Vector3 tangent = new Vector3(-direction.z, 0f, direction.x);
+                Vector3 basePoint = direction * 0.035f + Vector3.up * 0.035f;
+                Vector3 tip = basePoint + direction * Mathf.Lerp(0.24f, 0.37f, (float)random.NextDouble())
+                    + Vector3.up * Mathf.Lerp(0.22f, 0.36f, (float)random.NextDouble());
+                Vector3 side = tangent * Mathf.Lerp(0.045f, 0.07f, (float)random.NextDouble());
+                AddFoliageLeaf(vertices, normals, colors, triangles, basePoint - side, basePoint + side, tip, leafBase, leafTip);
+            }
+        }
+
+        private static void CreateAlpineBerryShrub(List<Vector3> vertices, List<Vector3> normals, List<Color32> colors, List<int> triangles, System.Random random)
+        {
+            Color stemBase = new Color(0.27f, 0.40f, 0.25f, 0.10f);
+            Color stemTip = new Color(0.39f, 0.54f, 0.30f, 0.14f);
+            Color leafBase = new Color(0.26f, 0.45f, 0.27f, 0.08f);
+            Color leafTip = new Color(0.56f, 0.70f, 0.34f, 0.16f);
+            const int branchCount = 6;
+            for (int branch = 0; branch < branchCount; branch++)
+            {
+                float angle = branch * Mathf.PI * 2f / branchCount + (float)random.NextDouble() * 0.34f;
+                Vector3 direction = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+                Vector3 tangent = new Vector3(-direction.z, 0f, direction.x);
+                float length = Mathf.Lerp(0.27f, 0.43f, (float)random.NextDouble());
+                float height = Mathf.Lerp(0.30f, 0.47f, (float)random.NextDouble());
+                Vector3 basePoint = direction * 0.025f + Vector3.up * 0.025f;
+                Vector3 branchTip = basePoint + direction * length + Vector3.up * height;
+                Vector3 stemSide = tangent * 0.014f;
+                AddFoliageLeaf(vertices, normals, colors, triangles, basePoint - stemSide, basePoint + stemSide, branchTip, stemBase, stemTip);
+
+                for (int leaf = 0; leaf < 3; leaf++)
+                {
+                    float alongBranch = 0.30f + leaf * 0.20f;
+                    Vector3 leafCenter = Vector3.Lerp(basePoint, branchTip, alongBranch);
+                    float sideSign = leaf % 2 == 0 ? 1f : -1f;
+                    Vector3 leafDirection = (direction * sideSign + Vector3.up * 0.18f).normalized;
+                    Vector3 leafTipPosition = leafCenter + leafDirection * Mathf.Lerp(0.12f, 0.19f, (float)random.NextDouble());
+                    Vector3 leafSide = tangent * Mathf.Lerp(0.055f, 0.082f, (float)random.NextDouble());
+                    AddFoliageLeaf(vertices, normals, colors, triangles, leafCenter - leafSide, leafCenter + leafSide, leafTipPosition, leafBase, leafTip);
+                }
+
+                if (branch % 2 == 0)
+                {
+                    Vector3 berryCluster = Vector3.Lerp(basePoint, branchTip, 0.67f) + tangent * 0.035f;
+                    Color berryColor = branch == 0
+                        ? new Color(0.47f, 0.29f, 0.59f, 0.04f)
+                        : new Color(0.68f, 0.31f, 0.34f, 0.04f);
+                    AddLowPolyBerry(vertices, normals, colors, triangles, berryCluster, 0.035f, berryColor);
+                    AddLowPolyBerry(vertices, normals, colors, triangles, berryCluster + direction * 0.045f + Vector3.up * 0.022f, 0.028f, berryColor);
+                }
+            }
+        }
+
+        private static void AddLowPolyBerry(List<Vector3> vertices, List<Vector3> normals, List<Color32> colors, List<int> triangles, Vector3 center, float radius, Color color)
+        {
+            Vector3 top = center + Vector3.up * radius;
+            Vector3 bottom = center - Vector3.up * radius;
+            Vector3[] ring =
+            {
+                center + Vector3.right * radius,
+                center + Vector3.forward * radius,
+                center - Vector3.right * radius,
+                center - Vector3.forward * radius
+            };
+
+            for (int i = 0; i < ring.Length; i++)
+            {
+                int next = (i + 1) % ring.Length;
+                AddBerryFace(vertices, normals, colors, triangles, top, ring[i], ring[next], center, color);
+                AddBerryFace(vertices, normals, colors, triangles, bottom, ring[next], ring[i], center, color);
+            }
+        }
+
+        private static void AddBerryFace(List<Vector3> vertices, List<Vector3> normals, List<Color32> colors, List<int> triangles,
+            Vector3 a, Vector3 b, Vector3 c, Vector3 center, Color color)
+        {
+            Vector3 normal = Vector3.Cross(b - a, c - a).normalized;
+            if (Vector3.Dot(normal, (a + b + c) / 3f - center) < 0f)
+            {
+                Vector3 swap = b;
+                b = c;
+                c = swap;
+                normal = -normal;
+            }
+
+            int first = vertices.Count;
+            vertices.Add(a);
+            vertices.Add(b);
+            vertices.Add(c);
+            normals.Add(normal);
+            normals.Add(normal);
+            normals.Add(normal);
+            colors.Add(color);
+            colors.Add(color);
+            colors.Add(color);
+            triangles.Add(first);
+            triangles.Add(first + 1);
+            triangles.Add(first + 2);
+        }
+
+        private static void AddFlowerHead(List<Vector3> vertices, List<Vector3> normals, List<Color32> colors, List<int> triangles, Vector3 center, Color petalColor)
+        {
+            const int petalCount = 6;
+            for (int i = 0; i < petalCount; i++)
+            {
+                float angle = i * Mathf.PI * 2f / petalCount;
+                Vector3 direction = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+                Vector3 tangent = new Vector3(-direction.z, 0f, direction.x);
+                Vector3 petalBase = center + direction * 0.012f;
+                Vector3 petalTip = center + direction * 0.132f + Vector3.up * 0.008f;
+                Vector3 side = tangent * 0.042f;
+                AddFoliageLeaf(vertices, normals, colors, triangles, petalBase - side, petalBase + side, petalTip, petalColor, petalColor);
+            }
+
+            Vector3 centerSide = new Vector3(0.018f, 0f, 0f);
+            AddFoliageLeaf(vertices, normals, colors, triangles, center - centerSide,
+                center + centerSide, center + new Vector3(0f, 0.01f, 0.018f),
+                new Color(0.96f, 0.84f, 0.48f, 0f), new Color(0.96f, 0.84f, 0.48f, 0f));
+        }
+
+        private static void AddFoliageLeaf(List<Vector3> vertices, List<Vector3> normals, List<Color32> colors, List<int> triangles,
+            Vector3 left, Vector3 right, Vector3 tip, Color baseColor, Color tipColor)
         {
             int first = vertices.Count;
             Vector3 normal = Vector3.Cross(right - left, tip - left).normalized;
@@ -471,20 +742,30 @@ namespace GoatDescent.ProceduralWorld.Editor
             normals.Add(normal);
             normals.Add(normal);
             normals.Add(normal);
+            colors.Add(baseColor);
+            colors.Add(baseColor);
+            colors.Add(tipColor);
             triangles.Add(first);
             triangles.Add(first + 1);
             triangles.Add(first + 2);
+        }
 
-            int back = vertices.Count;
-            vertices.Add(left);
-            vertices.Add(right);
-            vertices.Add(tip);
-            normals.Add(-normal);
-            normals.Add(-normal);
-            normals.Add(-normal);
-            triangles.Add(back);
-            triangles.Add(back + 2);
-            triangles.Add(back + 1);
+        private static int SelectGroundcoverVariant(WorldSample sample, System.Random random)
+        {
+            double roll = random.NextDouble();
+            if (sample.biome == BiomeKind.Mountain)
+            {
+                if (sample.snowMask > 0.16f && roll < 0.58d)
+                    return 3;
+                if (roll < 0.14d)
+                    return 4;
+                return roll < 0.49d ? 0 : roll < 0.72d ? 1 : 2;
+            }
+
+            if (sample.biome == BiomeKind.Forest)
+                return roll < 0.14d ? 4 : roll < 0.49d ? 0 : roll < 0.66d ? 1 : roll < 0.95d ? 2 : 3;
+
+            return roll < 0.14d ? 4 : roll < 0.55d ? 0 : roll < 0.72d ? 1 : roll < 0.92d ? 2 : 3;
         }
 
         private static List<WorldChunk> CreateChunks(Transform root, Scene scene, WorldSettings settings)
@@ -702,7 +983,7 @@ namespace GoatDescent.ProceduralWorld.Editor
                     if (renderer.name.Contains($"LOD{level}"))
                         renderers.Add(renderer);
                 if (renderers.Count > 0)
-                    lods.Add(new LOD(level == 0 ? 0.38f : level == 1 ? 0.15f : 0.04f, renderers.ToArray()));
+                    lods.Add(new LOD(level == 0 ? 0.48f : level == 1 ? 0.22f : 0.06f, renderers.ToArray()));
             }
             if (lods.Count == 0)
                 return;
@@ -1095,7 +1376,7 @@ namespace GoatDescent.ProceduralWorld.Editor
             Shader foliageShader = Shader.Find("GoatDescent/PineFoliage");
             Material grass = GetOrCreateMaterial(
                 "M_ProceduralGrass",
-                new Color(0.31f, 0.48f, 0.19f),
+                Color.white,
                 foliageShader);
             if (grass.HasProperty("_WindAmplitude"))
                 grass.SetFloat("_WindAmplitude", 0.14f);
@@ -1104,7 +1385,11 @@ namespace GoatDescent.ProceduralWorld.Editor
             if (grass.HasProperty("_WindSpeed"))
                 grass.SetFloat("_WindSpeed", 1.05f);
             if (grass.HasProperty("_FoliageGlow"))
-                grass.SetFloat("_FoliageGlow", 0.24f);
+                grass.SetFloat("_FoliageGlow", 0.18f);
+            if (grass.HasProperty("_FrostAmount"))
+                grass.SetFloat("_FrostAmount", 0.68f);
+            if (grass.HasProperty("_FrostTint"))
+                grass.SetColor("_FrostTint", new Color(0.78f, 0.88f, 0.95f, 1f));
             grass.enableInstancing = true;
             EditorUtility.SetDirty(grass);
             return grass;

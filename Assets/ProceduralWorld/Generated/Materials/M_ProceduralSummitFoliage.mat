@@ -28,6 +28,9 @@ Material:
     - _FoliageGlow: 0.2
     - _FrostAmount: 0.84
     - _Glossiness: 0.16
+    - _WindAmplitude: 0.2
+    - _WindHeight: 0.06
+    - _WindSpeed: 0.72
     m_Colors:
     - _Color: {r: 0.9, g: 0.99, b: 0.91, a: 1}
     - _FrostTint: {r: 0.86, g: 0.93, b: 0.99, a: 1}
