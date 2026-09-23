@@ -50,7 +50,9 @@ namespace GoatDescent.Editor
             var route = GameObject.Find("Ledges — guaranteed descent route");
             var camera = Camera.main;
             int ledgeObjects = route ? route.transform.childCount : 0;
-            bool ready = goat && body && !body.isKinematic && camera && ledgeObjects >= 38;
+            int solidLandingColliders = route ? route.GetComponentsInChildren<BoxCollider>(true).Length : 0;
+            bool reliableLandings = solidLandingColliders >= 55;
+            bool ready = goat && body && !body.isKinematic && camera && ledgeObjects >= 38 && reliableLandings;
 
             SettleSpawnAndCamera(camera);
             // Exercise the actual controller motor with a simulated held W key and a manual physics step.
@@ -59,7 +61,7 @@ namespace GoatDescent.Editor
             float cameraDistance = goat && camera ? Vector3.Distance(goat.transform.position, camera.transform.position) : 0f;
             bool cameraIsFollowing = cameraDistance > .5f && cameraDistance < 24f;
             ready &= bodyCanMove && cameraIsFollowing;
-            Debug.Log($"GOAT_DESCENT_PLAYMODE_SMOKE ready={ready} ledges={ledgeObjects} " +
+            Debug.Log($"GOAT_DESCENT_PLAYMODE_SMOKE ready={ready} ledges={ledgeObjects} solidLandingColliders={solidLandingColliders} " +
                       $"cameraDistance={cameraDistance:0.00} " +
                       $"bodyCanMove={bodyCanMove} motorSpeed={motorTravel:0.000} bodyStartY={before.y:0.00}");
             if (!ready) Debug.LogError("GOAT_DESCENT_PLAYMODE_SMOKE failed.");

@@ -5,19 +5,25 @@ namespace GoatDescent
     [RequireComponent(typeof(Camera))]
     public sealed class ThirdPersonGoatCamera : MonoBehaviour
     {
-        [SerializeField] private float distance = 11.5f;
-        [SerializeField] private float height = 2.0f;
+        [SerializeField] private float distance = 14f;
+        [SerializeField] private float height = 2.4f;
         [SerializeField] private float sensitivity = 150f;
         [SerializeField] private float minPitch = -25f;
         [SerializeField] private float maxPitch = 65f;
         [SerializeField] private float collisionRadius = .22f;
-        [SerializeField] private float lookAheadDistance = 12f;
-        [SerializeField] private float lookDownOffset = 13f;
+        [SerializeField] private float lookAheadDistance = 5f;
+        [SerializeField] private float lookDownOffset = 1f;
         [SerializeField] private Transform target;
         // The first safe ledge is below and slightly left of the summit; open the game looking at the decision.
-        private float yaw = -27f, pitch = 38f;
+        private float yaw = -27f, pitch = 20f;
         private bool hasInitialPosition;
         public void Configure(Transform newTarget) { target = newTarget; }
+        public void Configure(Transform newTarget, float initialYaw)
+        {
+            target = newTarget;
+            yaw = initialYaw;
+            hasInitialPosition = false;
+        }
         private void Start() { GetComponent<Camera>().fieldOfView = 72f; Cursor.lockState = CursorLockMode.Locked; }
         private void LateUpdate()
         {

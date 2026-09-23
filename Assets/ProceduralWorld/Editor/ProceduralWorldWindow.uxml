@@ -1,0 +1,41 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+  <ui:Style src="ProceduralWorldWindow.uss" />
+  <ui:VisualElement name="root" class="window-root">
+    <ui:Label text="Procedural World" class="title" />
+    <ui:Label text="Deterministic stylized world generation" class="subtitle" />
+    <ui:VisualElement class="section">
+      <ui:Label text="World" class="section-title" />
+      <ui:IntegerField name="seedField" label="Seed" />
+      <ui:FloatField name="worldSizeField" label="World Size" />
+      <ui:FloatField name="heightScaleField" label="Height Scale" />
+      <ui:FloatField name="seaLevelField" label="Sea Level" />
+    </ui:VisualElement>
+    <ui:VisualElement class="section">
+      <ui:Label text="Terrain and biomes" class="section-title" />
+      <ui:FloatField name="mountainStrengthField" label="Mountain Strength" />
+      <ui:FloatField name="mountainFrequencyField" label="Mountain Frequency" />
+      <ui:FloatField name="biomeScaleField" label="Biome Scale" />
+      <ui:FloatField name="erosionStrengthField" label="Erosion Strength" />
+    </ui:VisualElement>
+    <ui:VisualElement class="section">
+      <ui:Label text="Snow and grass" class="section-title" />
+      <ui:FloatField name="snowLineField" label="Snow Line (Normalized Height)" />
+      <ui:FloatField name="snowTemperatureThresholdField" label="Snow Temperature Threshold" />
+      <ui:FloatField name="snowCoverageField" label="Snow Coverage" />
+      <ui:FloatField name="grassDensityField" label="Grass Density" />
+      <ui:FloatField name="grassSlopeLimitField" label="Grass Slope Limit (Degrees)" />
+    </ui:VisualElement>
+    <ui:VisualElement class="section button-section">
+      <ui:Button name="generateWorldButton" text="Generate World" class="primary-button" />
+      <ui:Button name="terrainButton" text="Regenerate Terrain" />
+      <ui:Button name="biomesButton" text="Generate Biomes" />
+      <ui:Button name="vegetationButton" text="Generate Vegetation" />
+      <ui:Button name="rocksButton" text="Generate Rocks" />
+      <ui:Button name="cliffsButton" text="Generate Cliffs" />
+      <ui:Button name="debugButton" text="Generate Debug Maps" />
+      <ui:Button name="randomSeedButton" text="Random Seed" />
+      <ui:Button name="clearButton" text="Clear Generated Objects" class="danger-button" />
+    </ui:VisualElement>
+    <ui:Label name="statusLabel" class="status-label" />
+  </ui:VisualElement>
+</ui:UXML>

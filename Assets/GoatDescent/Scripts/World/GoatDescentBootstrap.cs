@@ -7,14 +7,13 @@ namespace GoatDescent
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void CreatePrototype()
         {
-            if (Object.FindFirstObjectByType<MountainPrototypeBuilder>() != null) return;
+            if (Object.FindFirstObjectByType<ProceduralWorldGameplayBootstrap>() != null) return;
             Physics.gravity = new Vector3(0f, -9.81f, 0f);
             Application.targetFrameRate = 120;
 
-            var world = new GameObject("Goat Descent Prototype");
-            world.AddComponent<MountainPrototypeBuilder>();
+            var world = new GameObject("Goat Descent Procedural World");
+            world.AddComponent<ProceduralWorldGameplayBootstrap>();
             world.AddComponent<PrototypeHud>();
-            world.AddComponent<PrototypeRuntimeValidator>();
         }
     }
 
