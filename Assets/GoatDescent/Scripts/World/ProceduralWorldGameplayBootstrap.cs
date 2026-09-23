@@ -72,11 +72,55 @@ namespace GoatDescent
             }
 
             Vector3 spawn = FindSummitSpawn(terrainCollider, terrain, settings);
-            float initialYaw = SummitSpawnUtility.FindVistaYaw(terrain, settings, spawn);
+            float vistaYaw = SummitSpawnUtility.FindVistaYaw(terrain, settings, spawn);
+            float initialYaw = FindSummitForestFacingYaw(worldScene, spawn, vistaYaw);
             if (ownsSettings)
                 Destroy(settings);
             CreateGoat(spawn, initialYaw);
-            Debug.Log($"PROCEDURAL_GOAT_WORLD_READY scene={WorldSceneName} spawn=({spawn.x:F1}, {spawn.y:F1}, {spawn.z:F1})");
+            Debug.Log($"PROCEDURAL_GOAT_WORLD_READY scene={WorldSceneName} spawn=({spawn.x:F1}, {spawn.y:F1}, {spawn.z:F1}) cameraYaw={initialYaw:F1}");
+        }
+
+        private static float FindSummitForestFacingYaw(Scene scene, Vector3 spawn, float vistaYaw)
+        {
+            const float forestBlend = 0.82f;
+            float nearestDistanceSquared = float.PositiveInfinity;
+            float nearestTreeYaw = vistaYaw;
+
+            // The summit grove sits below the generated chunk root. Inspect only
+            // that small branch of the hierarchy rather than walking the whole
+            // world (which also contains thousands of grass vertices/objects).
+            foreach (GameObject root in scene.GetRootGameObjects())
+            foreach (Transform generatedChunks in root.transform)
+            {
+                if (generatedChunks.name != "Generated chunks")
+                    continue;
+
+                foreach (Transform chunk in generatedChunks)
+                foreach (Transform grove in chunk)
+                {
+                    if (!grove.name.StartsWith("Summit Grove"))
+                        continue;
+
+                    foreach (Transform tree in grove)
+                    {
+                        if (!tree.name.StartsWith("Summit Conifer"))
+                            continue;
+
+                        Vector3 direction = tree.position - spawn;
+                        direction.y = 0f;
+                        float distanceSquared = direction.sqrMagnitude;
+                        if (distanceSquared >= nearestDistanceSquared || distanceSquared < 0.01f)
+                            continue;
+
+                        nearestDistanceSquared = distanceSquared;
+                        nearestTreeYaw = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg;
+                    }
+                }
+            }
+
+            return nearestDistanceSquared < float.PositiveInfinity
+                ? Mathf.LerpAngle(vistaYaw, nearestTreeYaw, forestBlend)
+                : vistaYaw;
         }
 
         private static void DisablePreviewCameras(Scene scene)

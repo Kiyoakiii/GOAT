@@ -5,8 +5,8 @@ namespace GoatDescent
     [RequireComponent(typeof(Camera))]
     public sealed class ThirdPersonGoatCamera : MonoBehaviour
     {
-        [SerializeField] private float distance = 14f;
-        [SerializeField] private float height = 2.4f;
+        [SerializeField] private float distance = 11.5f;
+        [SerializeField] private float height = 2.2f;
         [SerializeField] private float sensitivity = 150f;
         [SerializeField] private float minPitch = -25f;
         [SerializeField] private float maxPitch = 65f;
@@ -24,7 +24,7 @@ namespace GoatDescent
             yaw = initialYaw;
             hasInitialPosition = false;
         }
-        private void Start() { GetComponent<Camera>().fieldOfView = 72f; Cursor.lockState = CursorLockMode.Locked; }
+        private void Start() { GetComponent<Camera>().fieldOfView = 68f; Cursor.lockState = CursorLockMode.Locked; }
         private void LateUpdate()
         {
             target ??= FindFirstObjectByType<GoatController>()?.transform;
