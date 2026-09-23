@@ -12,8 +12,9 @@ namespace GoatDescent
             Application.targetFrameRate = 120;
 
             var world = new GameObject("Goat Descent Procedural World");
-            world.AddComponent<ProceduralWorldGameplayBootstrap>();
+            var bootstrap = world.AddComponent<ProceduralWorldGameplayBootstrap>();
             world.AddComponent<PrototypeHud>();
+            bootstrap.Begin();
         }
     }
 

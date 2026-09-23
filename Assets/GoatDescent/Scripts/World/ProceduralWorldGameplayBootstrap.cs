@@ -13,8 +13,20 @@ namespace GoatDescent
     public sealed class ProceduralWorldGameplayBootstrap : MonoBehaviour
     {
         private const string WorldSceneName = "ProceduralWorldMilestone";
+        private bool bootstrapStarted;
 
-        private IEnumerator Start()
+        private void Start() => Begin();
+
+        public void Begin()
+        {
+            if (bootstrapStarted)
+                return;
+            bootstrapStarted = true;
+            Debug.Log("PROCEDURAL_GOAT_BOOTSTRAP_START");
+            StartCoroutine(LoadAndSpawnWorld());
+        }
+
+        private IEnumerator LoadAndSpawnWorld()
         {
             Scene worldScene = SceneManager.GetSceneByName(WorldSceneName);
             if (!worldScene.isLoaded)
@@ -30,21 +42,25 @@ namespace GoatDescent
                 worldScene = SceneManager.GetSceneByName(WorldSceneName);
             }
 
+            Debug.Log($"PROCEDURAL_GOAT_WORLD_SCENE_READY scene={worldScene.name} loaded={worldScene.isLoaded}");
             SceneManager.SetActiveScene(worldScene);
             DisablePreviewCameras(worldScene);
-            yield return null;
-            Physics.SyncTransforms();
 
             WorldSettings settings = FindWorldSettings(worldScene);
             bool ownsSettings = settings == null;
             if (ownsSettings)
                 settings = ScriptableObject.CreateInstance<WorldSettings>();
 
-            TerrainBuildResult terrain = TerrainGenerator.Build(settings);
-            Collider terrainCollider = FindTerrainCollider(worldScene);
+            Terrain terrainSurface = FindTerrain(worldScene);
+            Debug.Log($"PROCEDURAL_GOAT_SETTINGS_READY resolution={settings.terrainResolution} terrainFound={(terrainSurface != null)}");
+            TerrainBuildResult terrain = terrainSurface != null
+                ? ReadSpawnSurface(terrainSurface, settings)
+                : TerrainGenerator.Build(settings);
+            Debug.Log($"PROCEDURAL_GOAT_TERRAIN_READY resolution={terrain.heights.GetLength(0)} seed={settings.seed} source={(terrainSurface ? "TerrainData" : "procedural fallback")}");
+            Collider terrainCollider = FindTerrainCollider(terrainSurface);
             if (terrainCollider == null)
             {
-                terrainCollider = CreateFallbackTerrainCollider(worldScene, settings, terrain);
+                terrainCollider = CreateFallbackTerrainCollider(worldScene, settings, terrain, terrainSurface ? terrainSurface.transform : null);
                 if (terrainCollider == null)
                 {
                     if (ownsSettings)
@@ -65,42 +81,125 @@ namespace GoatDescent
 
         private static void DisablePreviewCameras(Scene scene)
         {
+            // Preview cameras are direct children of the world root; do not walk
+            // every generated tree and grass object just to turn those off.
             foreach (GameObject root in scene.GetRootGameObjects())
-            foreach (Camera captureCamera in root.GetComponentsInChildren<Camera>(true))
-                captureCamera.enabled = false;
+            {
+                foreach (Camera captureCamera in root.GetComponents<Camera>())
+                    captureCamera.enabled = false;
+                foreach (Transform child in root.transform)
+                    foreach (Camera captureCamera in child.GetComponents<Camera>())
+                        captureCamera.enabled = false;
+            }
         }
 
-        private static Collider FindTerrainCollider(Scene scene)
+        private static Collider FindTerrainCollider(Terrain terrain)
         {
-            foreach (GameObject root in scene.GetRootGameObjects())
-            foreach (Collider collider in root.GetComponentsInChildren<Collider>(true))
-                if (collider.GetType().Name == "TerrainCollider")
-                    return collider;
-            return null;
+            return terrain != null ? terrain.GetComponent<Collider>() : null;
         }
 
         private static WorldSettings FindWorldSettings(Scene scene)
         {
             foreach (GameObject root in scene.GetRootGameObjects())
-            foreach (WorldGenerator generator in root.GetComponentsInChildren<WorldGenerator>(true))
-                if (generator.Settings != null)
+            {
+                WorldGenerator generator = root.GetComponent<WorldGenerator>();
+                if (generator != null && generator.Settings != null)
                     return generator.Settings;
+                foreach (Transform child in root.transform)
+                {
+                    generator = child.GetComponent<WorldGenerator>();
+                    if (generator != null && generator.Settings != null)
+                        return generator.Settings;
+                }
+            }
             return null;
         }
 
-        private static Collider CreateFallbackTerrainCollider(Scene scene, WorldSettings settings, TerrainBuildResult terrain)
+        private static Terrain FindTerrain(Scene scene)
+        {
+            foreach (GameObject root in scene.GetRootGameObjects())
+            {
+                Terrain terrain = root.GetComponent<Terrain>();
+                if (terrain != null && terrain.terrainData != null)
+                    return terrain;
+                foreach (Transform child in root.transform)
+                {
+                    terrain = child.GetComponent<Terrain>();
+                    if (terrain != null && terrain.terrainData != null)
+                        return terrain;
+                }
+            }
+            return null;
+        }
+
+        private static TerrainBuildResult ReadSpawnSurface(Terrain terrain, WorldSettings settings)
+        {
+            TerrainData data = terrain.terrainData;
+            int sourceResolution = data.heightmapResolution;
+            int resolution = Mathf.Min(sourceResolution, 257);
+            float[,] source = data.GetHeights(0, 0, sourceResolution, sourceResolution);
+            var result = new TerrainBuildResult
+            {
+                heights = new float[resolution, resolution],
+                slopes = new float[resolution, resolution]
+            };
+
+            float verticalScale = data.size.y * terrain.transform.lossyScale.y;
+            float verticalOffset = terrain.transform.position.y;
+            float maxHeight = float.NegativeInfinity;
+            for (int z = 0; z < resolution; z++)
+            for (int x = 0; x < resolution; x++)
+            {
+                int sourceX = Mathf.RoundToInt(x / (float)(resolution - 1) * (sourceResolution - 1));
+                int sourceZ = Mathf.RoundToInt(z / (float)(resolution - 1) * (sourceResolution - 1));
+                float worldHeight = verticalOffset + source[sourceZ, sourceX] * verticalScale;
+                result.heights[z, x] = worldHeight / Mathf.Max(settings.heightScale, 0.001f);
+                if (worldHeight > maxHeight)
+                {
+                    maxHeight = worldHeight;
+                    result.highestPoint = new Vector3(
+                        x / (float)(resolution - 1) * settings.worldSize,
+                        worldHeight,
+                        z / (float)(resolution - 1) * settings.worldSize);
+                }
+            }
+
+            float spacing = settings.worldSize / (resolution - 1);
+            for (int z = 0; z < resolution; z++)
+            for (int x = 0; x < resolution; x++)
+            {
+                int left = Mathf.Max(0, x - 1);
+                int right = Mathf.Min(resolution - 1, x + 1);
+                int down = Mathf.Max(0, z - 1);
+                int up = Mathf.Min(resolution - 1, z + 1);
+                float dx = (result.heights[z, right] - result.heights[z, left]) * settings.heightScale / Mathf.Max(spacing, 0.001f);
+                float dz = (result.heights[up, x] - result.heights[down, x]) * settings.heightScale / Mathf.Max(spacing, 0.001f);
+                result.slopes[z, x] = Mathf.Atan(Mathf.Sqrt(dx * dx + dz * dz)) * Mathf.Rad2Deg;
+            }
+            return result;
+        }
+
+        private static Collider CreateFallbackTerrainCollider(Scene scene, WorldSettings settings, TerrainBuildResult terrain, Transform terrainTransform)
         {
             if (terrain == null || terrain.heights == null)
                 return null;
 
-            int resolution = terrain.heights.GetLength(0);
+            int sourceResolution = terrain.heights.GetLength(0);
+            // TerrainCollider is unavailable in this Unity package setup. A full
+            // 513x513 triangle mesh is unnecessarily expensive to cook for player
+            // movement, so use a coarser collision surface while leaving the
+            // rendered terrain at its original resolution.
+            const int maximumCollisionResolution = 129;
+            int resolution = Mathf.Min(sourceResolution, maximumCollisionResolution);
             var vertices = new Vector3[resolution * resolution];
             for (int z = 0; z < resolution; z++)
             for (int x = 0; x < resolution; x++)
             {
+                int sourceX = Mathf.RoundToInt(x / (float)(resolution - 1) * (sourceResolution - 1));
+                int sourceZ = Mathf.RoundToInt(z / (float)(resolution - 1) * (sourceResolution - 1));
                 vertices[z * resolution + x] = new Vector3(
                     x / (float)(resolution - 1) * settings.worldSize,
-                    terrain.heights[z, x] * settings.heightScale,
+                    terrain.heights[sourceZ, sourceX] * settings.heightScale,
                     z / (float)(resolution - 1) * settings.worldSize);
             }
 
@@ -131,7 +230,6 @@ namespace GoatDescent
 
             var collisionObject = new GameObject("Procedural World Runtime MeshCollider");
             SceneManager.MoveGameObjectToScene(collisionObject, scene);
-            Transform terrainTransform = FindTerrainTransform(scene);
             if (terrainTransform != null)
             {
                 collisionObject.transform.SetPositionAndRotation(terrainTransform.position, terrainTransform.rotation);
@@ -140,16 +238,8 @@ namespace GoatDescent
 
             MeshCollider collider = collisionObject.AddComponent<MeshCollider>();
             collider.sharedMesh = mesh;
+            Debug.Log($"PROCEDURAL_GOAT_COLLISION_READY resolution={resolution} sourceResolution={sourceResolution} triangles={triangles.Length / 3}");
             return collider;
-        }
-
-        private static Transform FindTerrainTransform(Scene scene)
-        {
-            foreach (GameObject root in scene.GetRootGameObjects())
-            foreach (Component component in root.GetComponentsInChildren<Component>(true))
-                if (component != null && component.GetType().Name == "Terrain")
-                    return component.transform;
-            return null;
         }
 
         private static Vector3 FindSummitSpawn(Collider terrainCollider, TerrainBuildResult terrain, WorldSettings settings)

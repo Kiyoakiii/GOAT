@@ -261,7 +261,7 @@ namespace GoatDescent.ProceduralWorld.Editor
         private static void CreateGrassMeshes(Transform root, Scene scene, Terrain terrain, int[,] densityMap, TerrainBuildResult result, WorldSettings settings)
         {
             Mesh grassMesh = GetOrCreateGrassMeshAsset();
-            Material grassMaterial = GetOrCreateMaterial("M_ProceduralGrass", new Color(0.31f, 0.48f, 0.19f));
+            Material grassMaterial = GetOrCreateGrassMaterial();
             int detailResolution = densityMap.GetLength(0);
             int chunkCount = Mathf.CeilToInt(settings.worldSize / settings.chunkSize);
             int[] clumpsPerChunk = new int[chunkCount * chunkCount];
@@ -362,7 +362,7 @@ namespace GoatDescent.ProceduralWorld.Editor
         private static GameObject GetOrCreateGrassPrefab()
         {
             Mesh mesh = GetOrCreateGrassMeshAsset();
-            Material material = GetOrCreateMaterial("M_ProceduralGrass", new Color(0.31f, 0.48f, 0.19f));
+            Material material = GetOrCreateGrassMaterial();
             bool isExistingPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(GrassPrefabPath) != null;
             if (isExistingPrefab)
             {
@@ -1053,6 +1053,7 @@ namespace GoatDescent.ProceduralWorld.Editor
                 summitFoliage.SetColor("_Color", new Color(0.90f, 0.99f, 0.91f, 1f));
             if (summitFoliage.HasProperty("_FoliageGlow"))
                 summitFoliage.SetFloat("_FoliageGlow", 0.20f);
+            summitFoliage.enableInstancing = true;
             EditorUtility.SetDirty(summitFoliage);
             return new MaterialSet
             {
@@ -1083,8 +1084,30 @@ namespace GoatDescent.ProceduralWorld.Editor
                 material.SetFloat("_Glossiness", 0.16f);
             if (material.HasProperty("_FoliageGlow"))
                 material.SetFloat("_FoliageGlow", 0.20f);
+            if (name.Contains("Foliage") || name.Contains("Grass"))
+                material.enableInstancing = true;
             EditorUtility.SetDirty(material);
             return material;
+        }
+
+        private static Material GetOrCreateGrassMaterial()
+        {
+            Shader foliageShader = Shader.Find("GoatDescent/PineFoliage");
+            Material grass = GetOrCreateMaterial(
+                "M_ProceduralGrass",
+                new Color(0.31f, 0.48f, 0.19f),
+                foliageShader);
+            if (grass.HasProperty("_WindAmplitude"))
+                grass.SetFloat("_WindAmplitude", 0.14f);
+            if (grass.HasProperty("_WindHeight"))
+                grass.SetFloat("_WindHeight", 1.08f);
+            if (grass.HasProperty("_WindSpeed"))
+                grass.SetFloat("_WindSpeed", 1.05f);
+            if (grass.HasProperty("_FoliageGlow"))
+                grass.SetFloat("_FoliageGlow", 0.24f);
+            grass.enableInstancing = true;
+            EditorUtility.SetDirty(grass);
+            return grass;
         }
 
         private static void GenerateDebugTextures(WorldSettings settings, TerrainBuildResult result)
