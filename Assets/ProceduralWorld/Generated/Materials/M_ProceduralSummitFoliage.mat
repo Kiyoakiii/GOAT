@@ -34,5 +34,6 @@ Material:
     m_Colors:
     - _Color: {r: 0.9, g: 0.99, b: 0.91, a: 1}
     - _FrostTint: {r: 0.86, g: 0.93, b: 0.99, a: 1}
+    - _WindDirection: {r: 0.82, g: 0, b: 0.57, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

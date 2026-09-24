@@ -106,11 +106,11 @@ Mesh:
       m_Data: 4cfd1300699dcdfd1300059e29ff5e03649cabfd13006c9da0fd1300069ea1fe2705cb9d26fe13001c9e69fd13006b9e30fe5b053d9f37fd1300659ed3fc1300ee9d1dfc9904ed9e21fd1300ee9d51fd13004f9d75fb7c03189d18fd13000e9d92fd1300ea9ceffc6003a39bbffd0000519d95fe00000d9d75fda603fb9ae9fd0000f19c84fe00003b9daffea1051a9cd1fe0000ba9cd5fe00009d9dffffda05259dbafe0000ce9d17fe0000049ed3fe0305289f37fe0000b49da6fd0000429dacfcc703169f4cfd0000629d59fd0000d69cc5fba903f89c
       m_BitSize: 16
     m_UV:
-      m_NumItems: 0
-      m_Range: 0
+      m_NumItems: 144
+      m_Range: 1
       m_Start: 0
-      m_Data: 
-      m_BitSize: 0
+      m_Data: 00fc0f000000fc0f00007efe0f000000fc0f000000fc0f0000d8ff0f000000fc0f000000fc0f0000ffff0f000000fc0f000000fc0f00006cff0f000000fc0f000000fc0f000094fe0f000000fc0f000000fc0f000080fe0f000000fc0f000000fc0f00007efe0f000000fc0f000000fc0f0000d8ff0f000000fc0f000000fc0f0000ffff0f000000fc0f000000fc0f00006cff0f000000fc0f000000fc0f000094fe0f000000fc0f000000fc0f000080fe0f0000
+      m_BitSize: 10
     m_Normals:
       m_NumItems: 72
       m_Range: 1.8966212
@@ -149,7 +149,7 @@ Mesh:
       m_NumItems: 36
       m_Data: 40200c44611c48a22c4ce33c50244d54655d58a66d5ce77d60288e
       m_BitSize: 6
-    m_UVInfo: 0
+    m_UVInfo: 28672
   m_LocalAABB:
     m_Center: {x: 124.03035, y: 85.60188, z: 109.22656}
     m_Extent: {x: 0.3476982, y: 0.44828415, z: 0.326149}

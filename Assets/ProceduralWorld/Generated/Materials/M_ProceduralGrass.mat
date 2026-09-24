@@ -78,7 +78,7 @@ Material:
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _UVSec: 0
-    - _WindAmplitude: 0.14
+    - _WindAmplitude: 0.21
     - _WindHeight: 1.08
     - _WindSpeed: 1.05
     - _ZWrite: 1
@@ -86,5 +86,6 @@ Material:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _FrostTint: {r: 0.78, g: 0.88, b: 0.95, a: 1}
+    - _WindDirection: {r: 0.82, g: 0, b: 0.57, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

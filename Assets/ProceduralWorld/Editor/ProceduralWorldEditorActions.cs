@@ -193,6 +193,7 @@ namespace GoatDescent.ProceduralWorld.Editor
                 SpawnWorldObjects(chunks, previewScene, terrain, terrainResult, settings, rocks, trees, summitTrees, cliffs, materials);
                 CreateGrassMeshes(worldRoot.transform, previewScene, terrain, grassDensityMap, terrainResult, settings);
                 CreateLighting(worldRoot.transform, previewScene);
+                LifeDayAtmosphereEditor.ApplyToScene(previewScene, true, terrainResult.highestPoint);
                 CreateCaptureCameras(worldRoot.transform, previewScene, terrain, terrainResult, grassDensityMap, settings);
                 GenerateDebugTextures(settings, terrainResult);
                 EditorSceneManager.SaveScene(previewScene, outputScenePath);
@@ -470,6 +471,9 @@ namespace GoatDescent.ProceduralWorld.Editor
                 mesh.SetNormals(regenerated.normals);
                 mesh.SetColors(regenerated.colors32);
                 mesh.SetTriangles(regenerated.triangles, 0);
+                var windWeights = new List<Vector4>(regenerated.vertexCount);
+                regenerated.GetUVs(3, windWeights);
+                mesh.SetUVs(3, windWeights);
                 mesh.RecalculateBounds();
                 UnityEngine.Object.DestroyImmediate(regenerated);
                 EditorUtility.SetDirty(mesh);
@@ -524,6 +528,21 @@ namespace GoatDescent.ProceduralWorld.Editor
             mesh.SetNormals(normals);
             mesh.SetColors(colors);
             mesh.SetTriangles(triangles, 0);
+            float minimumHeight = float.MaxValue;
+            float maximumHeight = float.MinValue;
+            for (int i = 0; i < vertices.Count; i++)
+            {
+                minimumHeight = Mathf.Min(minimumHeight, vertices[i].y);
+                maximumHeight = Mathf.Max(maximumHeight, vertices[i].y);
+            }
+            float heightRange = Mathf.Max(0.001f, maximumHeight - minimumHeight);
+            var windWeights = new List<Vector4>(vertices.Count);
+            for (int i = 0; i < vertices.Count; i++)
+            {
+                float normalizedHeight = Mathf.Clamp01((vertices[i].y - minimumHeight) / heightRange);
+                windWeights.Add(new Vector4(normalizedHeight, 1f, 0f, 0f));
+            }
+            mesh.SetUVs(3, windWeights);
             mesh.RecalculateBounds();
             return mesh;
         }
@@ -1063,8 +1082,7 @@ namespace GoatDescent.ProceduralWorld.Editor
         {
             var cameraObject = CreateChild(name, root, scene);
             Camera camera = cameraObject.AddComponent<Camera>();
-            camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = new Color(0.27f, 0.43f, 0.55f);
+            camera.clearFlags = CameraClearFlags.Skybox;
             camera.fieldOfView = fieldOfView;
             camera.nearClipPlane = 0.3f;
             camera.farClipPlane = 5000f;
@@ -1379,11 +1397,13 @@ namespace GoatDescent.ProceduralWorld.Editor
                 Color.white,
                 foliageShader);
             if (grass.HasProperty("_WindAmplitude"))
-                grass.SetFloat("_WindAmplitude", 0.14f);
+                grass.SetFloat("_WindAmplitude", 0.21f);
             if (grass.HasProperty("_WindHeight"))
                 grass.SetFloat("_WindHeight", 1.08f);
             if (grass.HasProperty("_WindSpeed"))
                 grass.SetFloat("_WindSpeed", 1.05f);
+            if (grass.HasProperty("_WindDirection"))
+                grass.SetVector("_WindDirection", new Vector4(0.82f, 0f, 0.57f, 0f));
             if (grass.HasProperty("_FoliageGlow"))
                 grass.SetFloat("_FoliageGlow", 0.18f);
             if (grass.HasProperty("_FrostAmount"))
