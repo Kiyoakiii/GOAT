@@ -10,6 +10,22 @@ namespace GoatDescent.Editor
         public static void Build()
         {
             const string path = "Assets/GoatDescent/Art/RefinedGoat/Goat_Duo_Refined.fbx";
+            const string bodyAlbedoPath = "Assets/GoatDescent/Art/RefinedGoat/GoatBody_Albedo.png";
+            const string bodyNormalPath = "Assets/GoatDescent/Art/RefinedGoat/GoatBody_Normal.png";
+            const string darkAlbedoPath = "Assets/GoatDescent/Art/RefinedGoat/GoatDark_Albedo.png";
+            AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
+            var normalImporter = AssetImporter.GetAtPath(bodyNormalPath) as TextureImporter;
+            if (normalImporter != null && normalImporter.textureType != TextureImporterType.NormalMap)
+            {
+                normalImporter.textureType = TextureImporterType.NormalMap;
+                normalImporter.SaveAndReimport();
+            }
+            var bodyAlbedo = AssetDatabase.LoadAssetAtPath<Texture2D>(bodyAlbedoPath);
+            var bodyNormal = AssetDatabase.LoadAssetAtPath<Texture2D>(bodyNormalPath);
+            var darkAlbedo = AssetDatabase.LoadAssetAtPath<Texture2D>(darkAlbedoPath);
+            if (bodyAlbedo == null || bodyNormal == null || darkAlbedo == null)
+                throw new System.InvalidOperationException("Baked goat coat textures are missing from " + path);
+
             var importer = (ModelImporter)AssetImporter.GetAtPath(path);
             importer.animationType = ModelImporterAnimationType.Legacy;
             importer.SaveAndReimport();
@@ -39,11 +55,23 @@ namespace GoatDescent.Editor
                         var material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
                         if (material == null) { material = new Material(source); AssetDatabase.CreateAsset(material, materialPath); }
                         material.shader = Shader.Find("Standard");
-                        material.SetFloat("_Glossiness", .15f);
-                        if (source.name == "hideWhite" || source.name == "hideDark")
+                        material.SetFloat("_Metallic", 0f);
+                        if (source.name == "hideWhite")
                         {
-                            material.mainTexture = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/GoatDescent/Art/RefinedGoat/GoatPainted.png");
-                            material.color = source.name == "hideWhite" ? new Color(.87f,.85f,.8f).gamma : new Color(.072f,.065f,.06f).gamma;
+                            material.SetTexture("_MainTex", bodyAlbedo);
+                            material.SetTexture("_BumpMap", bodyNormal);
+                            material.SetFloat("_BumpScale", 1f);
+                            material.SetFloat("_Glossiness", .04f);
+                            material.EnableKeyword("_NORMALMAP");
+                            material.color = new Color(.78f, .76f, .71f, 1f);
+                        }
+                        else if (source.name == "hideDark")
+                        {
+                            material.SetTexture("_MainTex", darkAlbedo);
+                            material.SetTexture("_BumpMap", null);
+                            material.SetFloat("_Glossiness", .14f);
+                            material.DisableKeyword("_NORMALMAP");
+                            material.color = Color.white;
                         }
                         EditorUtility.SetDirty(material);
                         return material;

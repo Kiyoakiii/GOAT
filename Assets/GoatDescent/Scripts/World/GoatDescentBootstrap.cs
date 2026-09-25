@@ -27,7 +27,7 @@ namespace GoatDescent
             title ??= new GUIStyle(GUI.skin.label) { fontSize = 24, fontStyle = FontStyle.Bold, normal = { textColor = Color.white } };
             copy ??= new GUIStyle(GUI.skin.label) { fontSize = 14, normal = { textColor = new Color(1f, 1f, 1f, .9f) } };
             GUI.Label(new Rect(24, 22, 430, 32), "GOAT DESCENT", title);
-            GUI.Label(new Rect(25, 56, 650, 25), "WASD — move   Space — jump   Mouse — camera   R — summit reset   Esc — cursor", copy);
+            GUI.Label(new Rect(25, 56, 850, 25), "WASD — move   Space — jump   Mouse — camera   Wheel — zoom   R — summit reset   Esc — cursor", copy);
             var goat = Object.FindFirstObjectByType<GoatController>();
             string held = "";
             if (Input.GetKey(KeyCode.W)) held += "W "; if (Input.GetKey(KeyCode.A)) held += "A ";
