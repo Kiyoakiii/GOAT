@@ -15,6 +15,7 @@ namespace GoatDescent.ProceduralWorld.Editor
     public static class ProceduralWorldEditorActions
     {
         public const string SettingsPath = "Assets/ProceduralWorld/Data/WorldSettings_Prototype.asset";
+        public const string VegetationSettingsPath = "Assets/ProceduralWorld/Data/VegetationGenerationSettings_Prototype.asset";
         public const string ScenePath = "Assets/ProceduralWorld/Scenes/ProceduralWorldMilestone.unity";
         private const string GroundcoverPreviewScenePath = "Assets/ProceduralWorld/Scenes/ProceduralWorldGroundcoverPreview.unity";
         private const string TerrainDataPath = "Assets/ProceduralWorld/Generated/Terrain/ProceduralWorldTerrainData.asset";
@@ -142,6 +143,19 @@ namespace GoatDescent.ProceduralWorld.Editor
             return settings;
         }
 
+        public static VegetationGenerationSettings GetOrCreateVegetationSettings()
+        {
+            EnsureFolders();
+            VegetationGenerationSettings vegetation = AssetDatabase.LoadAssetAtPath<VegetationGenerationSettings>(VegetationSettingsPath);
+            if (vegetation == null)
+            {
+                vegetation = ScriptableObject.CreateInstance<VegetationGenerationSettings>();
+                AssetDatabase.CreateAsset(vegetation, VegetationSettingsPath);
+                AssetDatabase.SaveAssets();
+            }
+            return vegetation;
+        }
+
         public static void GenerateWorld(WorldSettings settings)
         {
             GenerateWorld(settings, ScenePath, true);
@@ -155,10 +169,11 @@ namespace GoatDescent.ProceduralWorld.Editor
                 throw new ArgumentException("An output scene path is required.", nameof(outputScenePath));
             EnsureFolders();
             AssetDatabase.Refresh();
+            VegetationGenerationSettings vegetation = GetOrCreateVegetationSettings();
             var stopwatch = Stopwatch.StartNew();
             TerrainData terrainData = GetOrCreateTerrainData();
             TerrainBuildResult terrainResult = TerrainGenerator.Build(settings);
-            int[,] grassDensityMap = ConfigureTerrainData(terrainData, terrainResult, settings);
+            int[,] grassDensityMap = ConfigureTerrainData(terrainData, terrainResult, settings, vegetation);
             MaterialSet materials = GetOrCreateMaterials();
             GameObject[] rocks = LoadPrefabs(RockPaths);
             GameObject[] trees = LoadPrefabs(TreePaths);
@@ -190,10 +205,11 @@ namespace GoatDescent.ProceduralWorld.Editor
 
                 CreateWater(worldRoot.transform, previewScene, settings, materials.water);
                 List<WorldChunk> chunks = CreateChunks(worldRoot.transform, previewScene, settings);
-                SpawnWorldObjects(chunks, previewScene, terrain, terrainResult, settings, rocks, trees, summitTrees, cliffs, materials);
+                SpawnWorldObjects(chunks, previewScene, terrain, terrainResult, settings, vegetation, rocks, trees, summitTrees, cliffs, materials);
                 CreateGrassMeshes(worldRoot.transform, previewScene, terrain, grassDensityMap, terrainResult, settings);
                 CreateLighting(worldRoot.transform, previewScene);
                 LifeDayAtmosphereEditor.ApplyToScene(previewScene, true, terrainResult.highestPoint);
+                MistyPillarsVistaEditor.ApplyToScene(previewScene);
                 CreateCaptureCameras(worldRoot.transform, previewScene, terrain, terrainResult, grassDensityMap, settings);
                 GenerateDebugTextures(settings, terrainResult);
                 EditorSceneManager.SaveScene(previewScene, outputScenePath);
@@ -211,7 +227,7 @@ namespace GoatDescent.ProceduralWorld.Editor
             }
         }
 
-        private static int[,] ConfigureTerrainData(TerrainData terrainData, TerrainBuildResult result, WorldSettings settings)
+        private static int[,] ConfigureTerrainData(TerrainData terrainData, TerrainBuildResult result, WorldSettings settings, VegetationGenerationSettings vegetation)
         {
             int resolution = result.heights.GetLength(0);
             terrainData.heightmapResolution = resolution;
@@ -255,14 +271,14 @@ namespace GoatDescent.ProceduralWorld.Editor
                 maps[z, x, 4] = snow / total;
             }
             terrainData.SetAlphamaps(0, 0, maps);
-            int[,] grassDensityMap = BuildGrassDensityMap(result, settings);
+            int[,] grassDensityMap = BuildGrassDensityMap(result, settings, vegetation);
             terrainData.SetDetailResolution(grassDensityMap.GetLength(0), 16);
             terrainData.detailPrototypes = Array.Empty<DetailPrototype>();
             EditorUtility.SetDirty(terrainData);
             return grassDensityMap;
         }
 
-        private static int[,] BuildGrassDensityMap(TerrainBuildResult result, WorldSettings settings)
+        private static int[,] BuildGrassDensityMap(TerrainBuildResult result, WorldSettings settings, VegetationGenerationSettings vegetation)
         {
             const int detailResolution = 512;
             var densityMap = new int[detailResolution, detailResolution];
@@ -281,7 +297,7 @@ namespace GoatDescent.ProceduralWorld.Editor
                 float patch = NoiseGenerator.SmoothMask(sample.grassDensity, 0.40f, 0.64f);
                 float biomeMultiplier = sample.biome == BiomeKind.Forest ? 0.62f : 1f;
                 float slopeMultiplier = 1f - NoiseGenerator.SmoothMask(slope, settings.grassSlopeLimit * 0.55f, settings.grassSlopeLimit);
-                float density = settings.grassDensity * patch * biomeMultiplier * slopeMultiplier * (1f - sample.snowMask);
+                float density = vegetation.grassDensity * patch * biomeMultiplier * slopeMultiplier * (1f - sample.snowMask);
                 densityMap[z, x] = Mathf.Clamp(Mathf.RoundToInt(density * 12f), 0, 22);
                 grassClumpCount += densityMap[z, x];
             }
@@ -809,7 +825,7 @@ namespace GoatDescent.ProceduralWorld.Editor
             return result;
         }
 
-        private static void SpawnWorldObjects(List<WorldChunk> chunks, Scene scene, Terrain terrain, TerrainBuildResult terrainResult, WorldSettings settings, GameObject[] rocks, GameObject[] trees, GameObject[] summitTrees, GameObject[] cliffs, MaterialSet materials)
+        private static void SpawnWorldObjects(List<WorldChunk> chunks, Scene scene, Terrain terrain, TerrainBuildResult terrainResult, WorldSettings settings, VegetationGenerationSettings vegetation, GameObject[] rocks, GameObject[] trees, GameObject[] summitTrees, GameObject[] cliffs, MaterialSet materials)
         {
             int spawnedRocks = 0;
             int spawnedTrees = 0;
@@ -834,6 +850,8 @@ namespace GoatDescent.ProceduralWorld.Editor
                 random = new System.Random(NoiseGenerator.DeriveSeed(settings.seed, chunk.Coordinate.x, chunk.Coordinate.y, 2029));
                 foreach (Vector2 point in JitteredPoints(chunk.Bounds, 42, random))
                 {
+                    if (random.NextDouble() >= vegetation.treeDensity)
+                        continue;
                     WorldSample sample = BiomeGenerator.Sample(point.x, point.y, settings);
                     float slope = TerrainGenerator.SampleSlope(point.x, point.y, settings);
                     if (!WorldPlacementRules.AllowsTree(sample, slope, settings))
@@ -857,11 +875,11 @@ namespace GoatDescent.ProceduralWorld.Editor
                 }
             }
 
-            int summitTreeCount = SpawnSummitGrove(chunks, scene, terrain, terrainResult, settings, summitTrees, materials);
+            int summitTreeCount = SpawnSummitGrove(chunks, scene, terrain, terrainResult, settings, vegetation, summitTrees, materials);
             Debug.Log($"PROCEDURAL_WORLD_SPAWN_OK trees={spawnedTrees} summitTrees={summitTreeCount} rocks={spawnedRocks} cliffs={spawnedCliffs}");
         }
 
-        private static int SpawnSummitGrove(List<WorldChunk> chunks, Scene scene, Terrain terrain, TerrainBuildResult terrainResult, WorldSettings settings, GameObject[] trees, MaterialSet materials)
+        private static int SpawnSummitGrove(List<WorldChunk> chunks, Scene scene, Terrain terrain, TerrainBuildResult terrainResult, WorldSettings settings, VegetationGenerationSettings vegetation, GameObject[] trees, MaterialSet materials)
         {
             if (trees == null || trees.Length < 4 || terrainResult == null || terrainResult.heights == null)
                 return 0;
@@ -878,7 +896,7 @@ namespace GoatDescent.ProceduralWorld.Editor
             float spacing = settings.worldSize / (resolution - 1);
             int peakX = Mathf.Clamp(Mathf.RoundToInt(goatSpawn.x / spacing), 0, resolution - 1);
             int peakZ = Mathf.Clamp(Mathf.RoundToInt(goatSpawn.z / spacing), 0, resolution - 1);
-            int targetTrees = Mathf.RoundToInt(130f * Mathf.Clamp(settings.vegetationDensity, 0.35f, 1.25f));
+            int targetTrees = Mathf.Max(0, vegetation.summitTreeCount);
             int planted = 0;
             var plantedPoints = new List<Vector2>(targetTrees);
             var random = new System.Random(NoiseGenerator.DeriveSeed(settings.seed, peakX, peakZ, 7759));

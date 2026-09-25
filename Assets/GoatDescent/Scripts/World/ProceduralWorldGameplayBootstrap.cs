@@ -60,7 +60,7 @@ namespace GoatDescent
             Collider terrainCollider = FindTerrainCollider(terrainSurface);
             if (terrainCollider == null)
             {
-                terrainCollider = CreateFallbackTerrainCollider(worldScene, settings, terrain, terrainSurface ? terrainSurface.transform : null);
+                terrainCollider = CreateFallbackTerrainCollider(worldScene, settings, terrain, terrainSurface);
                 if (terrainCollider == null)
                 {
                     if (ownsSettings)
@@ -74,6 +74,15 @@ namespace GoatDescent
             Vector3 spawn = FindSummitSpawn(terrainCollider, terrain, settings);
             float vistaYaw = SummitSpawnUtility.FindVistaYaw(terrain, settings, spawn);
             float initialYaw = FindSummitForestFacingYaw(worldScene, spawn, vistaYaw);
+            foreach (GameObject root in worldScene.GetRootGameObjects())
+            {
+                if (root.name != "Misty forest pillars vista") continue;
+                Transform marker = root.transform.Find("Forest pillar 21/Pillar Goat Spawn");
+                if (marker == null) continue;
+                spawn = marker.position;
+                initialYaw = marker.eulerAngles.y;
+                break;
+            }
             if (ownsSettings)
                 Destroy(settings);
             CreateGoat(spawn, initialYaw);
@@ -139,7 +148,19 @@ namespace GoatDescent
 
         private static Collider FindTerrainCollider(Terrain terrain)
         {
-            return terrain != null ? terrain.GetComponent<Collider>() : null;
+            if (terrain == null || terrain.terrainData == null || !terrain.gameObject.activeInHierarchy)
+                return null;
+
+            // Terrain Physics may be disabled in this project, so avoid a hard
+            // dependency on TerrainCollider and verify the actual hit surface.
+            Collider collider = terrain.GetComponent<Collider>();
+            if (collider == null || !collider.enabled)
+                return null;
+
+            Vector3 size = terrain.terrainData.size;
+            Vector3 probe = terrain.transform.TransformPoint(new Vector3(size.x * 0.5f, size.y + 10f, size.z * 0.5f));
+            var ray = new Ray(probe, -terrain.transform.up);
+            return collider.Raycast(ray, out _, size.y + 20f) ? collider : null;
         }
 
         private static WorldSettings FindWorldSettings(Scene scene)
@@ -223,28 +244,30 @@ namespace GoatDescent
             return result;
         }
 
-        private static Collider CreateFallbackTerrainCollider(Scene scene, WorldSettings settings, TerrainBuildResult terrain, Transform terrainTransform)
+        private static Collider CreateFallbackTerrainCollider(Scene scene, WorldSettings settings, TerrainBuildResult terrain, Terrain terrainSurface)
         {
             if (terrain == null || terrain.heights == null)
                 return null;
 
-            int sourceResolution = terrain.heights.GetLength(0);
-            // TerrainCollider is unavailable in this Unity package setup. A full
-            // 513x513 triangle mesh is unnecessarily expensive to cook for player
-            // movement, so use a coarser collision surface while leaving the
-            // rendered terrain at its original resolution.
-            const int maximumCollisionResolution = 129;
-            int resolution = Mathf.Min(sourceResolution, maximumCollisionResolution);
+            // Use the same height samples as the rendered Terrain. Downsampling
+            // the collision mesh made steep summit ridges visually solid but
+            // physically much lower, so the goat could walk into the mountain.
+            TerrainData terrainData = terrainSurface != null ? terrainSurface.terrainData : null;
+            int resolution = terrainData != null ? terrainData.heightmapResolution : terrain.heights.GetLength(0);
+            float[,] heights = terrainData != null
+                ? terrainData.GetHeights(0, 0, resolution, resolution)
+                : terrain.heights;
+            Vector3 terrainSize = terrainData != null
+                ? terrainData.size
+                : new Vector3(settings.worldSize, settings.heightScale, settings.worldSize);
             var vertices = new Vector3[resolution * resolution];
             for (int z = 0; z < resolution; z++)
             for (int x = 0; x < resolution; x++)
             {
-                int sourceX = Mathf.RoundToInt(x / (float)(resolution - 1) * (sourceResolution - 1));
-                int sourceZ = Mathf.RoundToInt(z / (float)(resolution - 1) * (sourceResolution - 1));
                 vertices[z * resolution + x] = new Vector3(
-                    x / (float)(resolution - 1) * settings.worldSize,
-                    terrain.heights[sourceZ, sourceX] * settings.heightScale,
-                    z / (float)(resolution - 1) * settings.worldSize);
+                    x / (float)(resolution - 1) * terrainSize.x,
+                    heights[z, x] * terrainSize.y,
+                    z / (float)(resolution - 1) * terrainSize.z);
             }
 
             int quadCount = (resolution - 1) * (resolution - 1);
@@ -274,15 +297,15 @@ namespace GoatDescent
 
             var collisionObject = new GameObject("Procedural World Runtime MeshCollider");
             SceneManager.MoveGameObjectToScene(collisionObject, scene);
-            if (terrainTransform != null)
+            if (terrainSurface != null)
             {
-                collisionObject.transform.SetPositionAndRotation(terrainTransform.position, terrainTransform.rotation);
-                collisionObject.transform.localScale = terrainTransform.lossyScale;
+                collisionObject.transform.SetPositionAndRotation(terrainSurface.transform.position, terrainSurface.transform.rotation);
+                collisionObject.transform.localScale = terrainSurface.transform.lossyScale;
             }
 
             MeshCollider collider = collisionObject.AddComponent<MeshCollider>();
             collider.sharedMesh = mesh;
-            Debug.Log($"PROCEDURAL_GOAT_COLLISION_READY resolution={resolution} sourceResolution={sourceResolution} triangles={triangles.Length / 3}");
+            Debug.Log($"PROCEDURAL_GOAT_COLLISION_READY resolution={resolution} triangles={triangles.Length / 3} matchesTerrain={(terrainData != null)}");
             return collider;
         }
 
@@ -301,6 +324,7 @@ namespace GoatDescent
         {
             var goat = new GameObject("Mountain Goat");
             goat.transform.position = spawn;
+            goat.transform.rotation = Quaternion.Euler(0f, initialYaw, 0f);
             int playerLayer = LayerMask.NameToLayer("Player");
             if (playerLayer >= 0)
                 goat.layer = playerLayer;
