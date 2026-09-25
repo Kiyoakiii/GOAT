@@ -1,0 +1,10 @@
+Asset: Goat (rigged, low-poly, GLB)
+Publisher: Gobkit
+Pack: Gobkit Free Animal Pack B — Rigged Low-Poly Creatures
+Asset page: https://gobkit.itch.io/gobkit-free-animal-pack-vol-2
+Direct model: https://gobkit.com/freebies/animalB/Goat.glb
+License: CC0 1.0 (public domain), per publisher metadata. No attribution required.
+Original animations: idle, attack, dead, walk (24 FPS)
+Files: Goat_CC0.glb (original downloaded model); Goat_CC0.blend (prepared Blender scene)
+
+Unity character: white GoatRig_A from A:/GameDev/Blender/Goat_CC0/Goat_Duo_Refined.blend. Exported with Tools/Blender/export_refined_goat.py. Game FBX excludes Blender particle fur and generated fur meshes. Imported actions: Goat_Idle, Goat_Walk, Goat_Jump, Goat_EatGrass, Goat_Pee, Goat_Poop, Goat_Sequence, GoatA_Duo_Performance, GoatB_Duo_Performance. Original Blender scene and original GLB remain untouched.

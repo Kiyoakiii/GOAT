@@ -26,6 +26,10 @@ namespace GoatDescent
         private GoatGroundDetector ground;
         private Transform visual;
         private float landSquash;
+        private Animation importedAnimation;
+        private string manualActionClip;
+        private float manualActionUntil;
+        private GUIStyle animationHelpStyle;
 
         public void Configure(Rigidbody targetBody, GoatGroundDetector targetGround)
         {
@@ -48,6 +52,20 @@ namespace GoatDescent
 
         private void BuildVisual()
         {
+            var refined = Resources.Load<GameObject>("GoatDuoRefined");
+            if (refined != null)
+            {
+                visual = Instantiate(refined, transform, false).transform;
+                visual.name = VisualName;
+                importedAnimation = visual.GetComponentInChildren<Animation>();
+                if (importedAnimation != null)
+                {
+                    foreach (AnimationState state in importedAnimation)
+                        state.wrapMode = state.name == "Goat_Idle" || state.name == "Goat_Walk" ? WrapMode.Loop : state.name == "Goat_Jump" ? WrapMode.ClampForever : WrapMode.Once;
+                    importedAnimation.Play("Goat_Idle");
+                }
+                return;
+            }
             EnsureMaterials();
             visual = new GameObject(VisualName).transform;
             visual.SetParent(transform, false);
@@ -209,6 +227,22 @@ namespace GoatDescent
             if (!visual || !body)
                 return;
 
+            if (importedAnimation != null)
+            {
+                ReadAnimationHotkeys();
+                if (!string.IsNullOrEmpty(manualActionClip) && Time.time >= manualActionUntil)
+                    manualActionClip = null;
+
+                if (string.IsNullOrEmpty(manualActionClip))
+                {
+                    Vector3 velocity = body.linearVelocity;
+                    velocity.y = 0f;
+                    string clip = ground && !ground.IsGrounded ? "Goat_Jump" : velocity.sqrMagnitude > .2f ? "Goat_Walk" : "Goat_Idle";
+                    if (!importedAnimation.IsPlaying(clip))
+                        importedAnimation.CrossFade(clip, .15f);
+                }
+            }
+
             Vector3 horizontal = body.linearVelocity;
             horizontal.y = 0f;
             if (horizontal.sqrMagnitude > 0.2f)
@@ -222,6 +256,48 @@ namespace GoatDescent
                 landSquash = 0.14f;
             landSquash = Mathf.MoveTowards(landSquash, 0f, Time.deltaTime * 1.6f);
             visual.localScale = new Vector3(1f + landSquash * 0.35f, 1f - landSquash, 1f + landSquash * 0.35f);
+        }
+
+        private void ReadAnimationHotkeys()
+        {
+            if (Input.GetKeyDown(KeyCode.Q)) PlayManualAction("Goat_EatGrass");
+            else if (Input.GetKeyDown(KeyCode.E)) PlayManualAction("Goat_Pee");
+            else if (Input.GetKeyDown(KeyCode.C)) PlayManualAction("Goat_Poop");
+            else if (Input.GetKeyDown(KeyCode.V)) PlayManualAction("Goat_Sequence");
+            else if (Input.GetKeyDown(KeyCode.Z)) PlayManualAction("GoatA_Duo_Performance");
+            else if (Input.GetKeyDown(KeyCode.X)) PlayManualAction("GoatB_Duo_Performance");
+        }
+
+        private void PlayManualAction(string clipName)
+        {
+            AnimationState state = importedAnimation[clipName];
+            if (state == null)
+            {
+                Debug.LogWarning($"Goat animation clip '{clipName}' is missing from GoatDuoRefined.");
+                return;
+            }
+
+            state.wrapMode = WrapMode.Once;
+            state.time = 0f;
+            state.speed = 1f;
+            manualActionClip = clipName;
+            manualActionUntil = Time.time + Mathf.Max(state.length, 0.25f);
+            importedAnimation.CrossFade(clipName, 0.2f, PlayMode.StopSameLayer);
+        }
+
+        private void OnGUI()
+        {
+            if (importedAnimation == null)
+                return;
+
+            animationHelpStyle ??= new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 15,
+                normal = { textColor = new Color(1f, 1f, 1f, 0.94f) }
+            };
+            GUI.Label(new Rect(25, 108, 960, 24),
+                "Анимации: Q — трава   E — пописать   C — покакать   V — весь ролик   Z/X — роли дуэта",
+                animationHelpStyle);
         }
     }
 }
