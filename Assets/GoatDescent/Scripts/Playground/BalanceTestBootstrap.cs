@@ -9,6 +9,10 @@ namespace GoatDescent
     public sealed class BalanceTestBootstrap : MonoBehaviour
     {
         private const float StartZ = -20f, EndZ = 30f;
+        private static readonly float[] LedgePositions = { -20f, -11f, -9f, -6.8f, -4.4f, -2.1f,
+            .6f, 3f, 5.5f, 8.2f, 10.4f, 13f, 16f, 19f, 30f };
+        private static readonly float[] LedgeHeights = { 39f, 36f, 35.7f, 29.6f, 29.1f, 22.9f,
+            22.4f, 16.1f, 15.6f, 9.8f, 9.4f, 4.1f, 3.6f, 1f, 1f };
         private GoatSlopeBalance balance;
         private Rigidbody goatBody;
         private GoatGroundDetector ground;
@@ -73,10 +77,12 @@ namespace GoatDescent
 
         private static float BaseHeight(float z)
         {
-            if (z < -10f) return 36f + (-10f - z) * .35f;
-            if (z < -2f) return 36f - (z + 10f) * 1.375f;
-            if (z < 9f) return 25f - (z + 2f) * 1.273f;
-            if (z < 18f) return 11f - (z - 9f) * 1.111f;
+            // Broad places to land alternate with short, steep rock faces.
+            // Keep this a single heightfield so every ledge is solid under the hooves.
+            for (int i = 1; i < LedgePositions.Length; i++)
+                if (z <= LedgePositions[i])
+                    return Mathf.Lerp(LedgeHeights[i - 1], LedgeHeights[i],
+                        Mathf.InverseLerp(LedgePositions[i - 1], LedgePositions[i], z));
             return 1f;
         }
 
@@ -85,7 +91,12 @@ namespace GoatDescent
             float width = Mathf.Lerp(5.2f, 2.25f, Smooth(-12f, -2f, z));
             width = Mathf.Lerp(width, .84f, Smooth(-2f, 5f, z));
             width = Mathf.Lerp(width, 1.45f, Smooth(10f, 18f, z));
-            return Mathf.Lerp(width, 5f, Smooth(18f, 23f, z)) + Mathf.Sin(z * .69f) * .18f;
+            float shelf = .7f * Lobe(0f, z, 0f, -5.4f, 1f, 1.3f)
+                + .65f * Lobe(0f, z, 0f, -.5f, 1f, 1.3f)
+                + .55f * Lobe(0f, z, 0f, 7.1f, 1f, 1.3f)
+                + .8f * Lobe(0f, z, 0f, 11.5f, 1f, 1.5f);
+            return Mathf.Lerp(width, 5f, Smooth(18f, 23f, z))
+                + Mathf.Sin(z * .69f) * .18f + shelf;
         }
 
         public static float HeightAt(float x, float z)
@@ -97,20 +108,32 @@ namespace GoatDescent
                 + .72f * Lobe(x, z, -.38f, 3.5f, .62f, 1.0f)
                 + .92f * Lobe(x, z, .75f, 12.8f, .88f, 1.4f)
                 + .48f * Lobe(x, z, -1.6f, 16f, 1.0f, 1.35f);
+            // The middle cuts straight down. Alternating side shelves give a slower
+            // zigzag line and the low rock noses can be jumped from deliberately.
+            float chute = -.65f * Lobe(x, z, 0f, -7.7f, .8f, 1.2f)
+                - .8f * Lobe(x, z, 0f, -3f, .75f, 1.1f)
+                - .7f * Lobe(x, z, 0f, 4f, .68f, 1.2f)
+                - .75f * Lobe(x, z, 0f, 9.2f, .75f, 1.1f);
+            float sideShelves = .48f * Lobe(x, z, -1.5f, -5.4f, .85f, 1.15f)
+                + .48f * Lobe(x, z, 1.2f, -.5f, .8f, 1.1f)
+                + .4f * Lobe(x, z, -1.0f, 7.1f, .65f, 1.05f)
+                + .45f * Lobe(x, z, 1.25f, 11.5f, .75f, 1.15f);
             float bank = Smooth(8f, 12f, z) * (1f - Smooth(18f, 22f, z)) * across * .34f;
             float rough = (Mathf.PerlinNoise(x * .65f + 13f, z * .48f + 7f) - .5f) * .23f
                 * Smooth(-11f, -7f, z) * (1f - Smooth(19f, 23f, z));
             float weathering = (Mathf.PerlinNoise(x * .19f + 27f, z * .13f + 4f) - .5f) * 1.15f
                 + Mathf.Sin(z * .37f + x * .17f) * .21f;
             float flanks = Mathf.Max(0f, Mathf.Abs(across) - WidthAt(z) - 2.35f) * .48f;
-            return BaseHeight(z) + protrusions + bank + rough
+            float staggeredZ = z + Mathf.Sin(x * .7f + z * .31f) * .3f
+                + (Mathf.PerlinNoise(x * .48f + 19f, z * .22f + 13f) - .5f) * .22f;
+            return BaseHeight(staggeredZ) + protrusions + chute + sideShelves + bank + rough
                 + weathering * Smooth(WidthAt(z), WidthAt(z) + 4f, Mathf.Abs(across))
                 - edge * 7.5f - flanks;
         }
 
         private void BuildCliff(MountainArt art)
         {
-            const int columns = 176, rows = 180;
+            const int columns = 176, rows = 240;
             var vertices = new List<Vector3>((columns + 1) * (rows + 1));
             var triangles = new List<int>(columns * rows * 6);
             for (int row = 0; row <= rows; row++)
@@ -130,7 +153,7 @@ namespace GoatDescent
                 triangles.Add(a); triangles.Add(b); triangles.Add(a + 1);
                 triangles.Add(a + 1); triangles.Add(b); triangles.Add(b + 1);
             }
-            var mesh = art.MakeMesh("Test cliff with real rock noses and narrow spine", vertices, triangles);
+            var mesh = art.MakeMesh("Test cliff with staggered rock ledges", vertices, triangles);
             var shader = Resources.Load<Shader>("AlpineSurface");
             var material = shader ? art.Own(new Material(shader)) : art.Stone;
             if (shader)
@@ -138,7 +161,7 @@ namespace GoatDescent
                 material.SetColor("_SnowColor", new Color(.53f, .59f, .60f));
                 material.SetColor("_StoneColor", new Color(.28f, .34f, .38f));
             }
-            var surface = art.MeshPart(transform, "BALANCE TEST — sculpted tilted cliff", mesh,
+            var surface = art.MeshPart(transform, "BALANCE TEST — five solid rock ledges", mesh,
                 Vector3.zero, material, true);
             surface.AddComponent<MountainSlopeSurface>();
         }
@@ -221,8 +244,9 @@ namespace GoatDescent
             GUI.color = Color.white;
             GUI.Label(new Rect(34f, 28f, width - 25f, 33f), "ЛАБОРАТОРИЯ БАЛАНСА", heading);
             float z = balance.transform.position.z;
-            string section = z < -9f ? "ШИРОКИЙ СТАРТ" : z < -2f ? "НАКЛОН И КАМЕННЫЙ ВЫСТУП"
-                : z < 9f ? "УЗКИЙ ГРЕБЕНЬ" : z < 18f ? "БОКОВОЙ УКЛОН" : "ФИНИШНАЯ ПОЛКА";
+            string section = z < -9f ? "СТАРТОВАЯ ПОЛКА" : z < -4.4f ? "ПЕРВЫЙ УСТУП"
+                : z < .6f ? "ВТОРОЙ УСТУП" : z < 5.5f ? "УЗКИЙ ТРЕТИЙ УСТУП"
+                : z < 10.4f ? "ЧЕТВЁРТЫЙ УСТУП" : z < 16f ? "НИЖНИЕ ПОЛКИ" : "ФИНИШ";
             GUI.Label(new Rect(34f, 65f, 415f, 25f), section, body);
             GUI.Label(new Rect(34f, 92f, 415f, 25f),
                 $"Баланс {balance.Balance01 * 100f:0}%   •   Опора {balance.HoovesHolding}/4", body);
@@ -238,7 +262,7 @@ namespace GoatDescent
                 GUI.Label(new Rect(35f + i * 98f, 145f, 85f, 23f), feet[i] + (balance.HoofHolds(i) ? " ●" : " ○"), body);
             }
             GUI.color = Color.white;
-            GUI.Label(new Rect(34f, 181f, 420f, 26f), "WASD — шаг   Ctrl — медленно   A/D — выправить   R — снова", body);
+            GUI.Label(new Rect(34f, 181f, 420f, 26f), "A/D — ищи полки   Space — прыгай   Ctrl — тормози   R — снова", body);
         }
     }
 }
