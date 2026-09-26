@@ -9,6 +9,9 @@ EditorBuildSettings:
     path: Assets/GoatDescent/Scenes/MovementTestScene.unity
     guid: a89a22af05c4d8741b158ae766cf046a
   - enabled: 1
+    path: Assets/GoatDescent/Scenes/BalanceTestScene.unity
+    guid: 7e689e0d625c4faba8dfd987b54cb762
+  - enabled: 1
     path: Assets/GoatDescent/Scenes/CliffBalancePrototype.unity
     guid: cdf7d2ad72beaff4ea116a22d37cb8bc
   m_configObjects: {}

@@ -29,6 +29,16 @@ namespace GoatDescent
             fieldOfViewKick = Mathf.Max(fieldOfViewKick, extraFieldOfView);
         }
         public void Configure(Transform newTarget) { target = newTarget; }
+        public void SetPitch(float degrees) { pitch = Mathf.Clamp(degrees, minPitch, maxPitch); Snap(); }
+        public void SetTestCliffView()
+        {
+            distance = 8f;
+            height = 4.5f;
+            lookAheadDistance = 6f;
+            lookDownOffset = 2f;
+            pitch = 45f;
+            Snap();
+        }
         public void Configure(Transform newTarget, float initialYaw)
         {
             target = newTarget;

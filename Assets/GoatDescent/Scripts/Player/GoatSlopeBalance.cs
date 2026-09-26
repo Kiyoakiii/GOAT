@@ -19,6 +19,7 @@ namespace GoatDescent
         public float Balance01 { get; private set; } = 1f;
         public int HoovesHolding { get; private set; }
         public float LeanDegrees => lean;
+        public bool HoofHolds(int index) => index >= 0 && index < hoofHolding.Length && hoofHolding[index];
 
         private void Awake()
         {
@@ -85,25 +86,29 @@ namespace GoatDescent
                 (Input.GetKey(KeyCode.A) ? 1f : 0f);
             // Momentum and the rider's steer move the projected weight across the hoof span.
             float offset = Vector3.Dot(body.position - supportCenter, right)
-                + Vector3.Dot(body.linearVelocity, right) * .035f - steering * .12f;
+                + Vector3.Dot(body.linearVelocity, right) * .022f - steering * .10f;
             float midpoint = (left + rightEdge) * .5f;
             float halfSpan = Mathf.Max(.19f, (rightEdge - left) * .5f);
-            float outside = Mathf.Max(0f, Mathf.Abs(offset - midpoint) / halfSpan - .4f);
-            float slopeCost = Mathf.InverseLerp(30f, 78f, ground.SlopeAngle) * .23f;
-            float speedCost = Mathf.Clamp01(body.linearVelocity.magnitude / 29f) * .20f;
-            float missingCost = (4 - HoovesHolding) * .19f;
-            float target = Mathf.Clamp01(1f - outside * .63f - slopeCost - speedCost - missingCost);
-            Balance01 = Mathf.MoveTowards(Balance01, target, Time.fixedDeltaTime * 1.9f);
+            float outside = Mathf.Max(0f, Mathf.Abs(offset - midpoint) / halfSpan - .75f);
+            float slopeCost = Mathf.InverseLerp(40f, 78f, ground.SlopeAngle) * .06f;
+            float speedCost = Mathf.Clamp01(body.linearVelocity.magnitude / 30f) * .07f;
+            float missingCost = (4 - HoovesHolding) * .12f;
+            bool braking = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+            float recklessTurn = Mathf.Abs(steering) * Mathf.InverseLerp(8f, 18f, body.linearVelocity.magnitude)
+                * (braking ? .25f : 1f) * .21f;
+            float target = Mathf.Clamp01(1f - outside * .50f - slopeCost - speedCost
+                - missingCost - recklessTurn);
+            Balance01 = Mathf.MoveTowards(Balance01, target, Time.fixedDeltaTime * 2.4f);
             lean = Mathf.MoveTowards(lean, Mathf.Clamp(-(offset - midpoint) * 38f, -22f, 22f),
                 Time.fixedDeltaTime * 70f);
 
-            if (Balance01 < .44f && Time.time >= catchCooldown)
+            if (Balance01 < .28f && Time.time >= catchCooldown)
             {
                 float direction = Mathf.Sign(offset - midpoint);
-                body.AddForce(right * direction * (.44f - Balance01) * 13f, ForceMode.Acceleration);
+                body.AddForce(right * direction * (.28f - Balance01) * 10f, ForceMode.Acceleration);
             }
-            fallTime = Balance01 < .16f ? fallTime + Time.fixedDeltaTime : 0f;
-            if (fallTime > .35f && Time.time >= catchCooldown)
+            fallTime = Balance01 < .12f ? fallTime + Time.fixedDeltaTime : 0f;
+            if (fallTime > .65f && Time.time >= catchCooldown)
             {
                 // A readable stumble: lose the foothold and get a chance to steer back.
                 body.AddForce(normal * 2.7f + right * Mathf.Sign(offset - midpoint) * 2.2f,

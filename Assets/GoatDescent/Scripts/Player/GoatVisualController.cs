@@ -139,7 +139,8 @@ namespace GoatDescent
                 model.localScale = Vector3.one * .78f;
             }
             // The old stylized parts remain as fragments for the comic crash effect.
-            foreach (var renderer in torso.GetComponentsInChildren<MeshRenderer>())
+            // The old legs are siblings of Torso Motion, so hide the entire old rig.
+            foreach (var renderer in visual.GetComponentsInChildren<MeshRenderer>())
                 if (!renderer.transform.IsChildOf(model)) renderer.enabled = false;
             importedAnimation = model.GetComponentInChildren<Animation>();
             if (importedAnimation && importedAnimation["Goat_Idle"] != null)

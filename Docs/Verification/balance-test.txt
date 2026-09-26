@@ -1,0 +1,1 @@
+goat=True cliff=True relief=67,1m model=True oldLegsVisible=0 slope=51,9 grounded=True hooves=4 balance=0,97
