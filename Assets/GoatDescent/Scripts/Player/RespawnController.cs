@@ -27,6 +27,7 @@ namespace GoatDescent
             GetComponent<GoatJumpController>()?.ResetJumpState();
             GetComponent<GoatWallJumpController>()?.ResetWallJumps();
             GetComponent<GoatGripController>()?.ResetGrip();
+            GetComponent<GoatSlopeBalance>()?.ResetBalance();
             GetComponent<GoatRainbowDash>()?.ResetDash();
             Camera.main?.GetComponent<ThirdPersonGoatCamera>()?.Snap();
         }

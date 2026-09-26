@@ -16,6 +16,7 @@ namespace GoatDescent
         private Transform headPivot;
         private Transform tailPivot;
         private Transform tongue;
+        private Animation importedAnimation;
         private float walkCycle;
         private float gaitWeight;
         private float squash;
@@ -50,6 +51,7 @@ namespace GoatDescent
             visual = transform.Find(RootName);
             if (!visual) BuildVisual();
             CacheRig();
+            AttachRefinedGoat();
         }
 
         private void BuildVisual()
@@ -119,6 +121,34 @@ namespace GoatDescent
             ears[1] = headPivot ? headPivot.Find("Right ear") : null;
             for (int i = 0; i < legPivots.Length; i++)
                 legPivots[i] = visual ? visual.Find($"Leg Pivot {i}") : null;
+            importedAnimation = torso ? torso.Find("Refined FBX goat")?.GetComponentInChildren<Animation>() : null;
+        }
+
+        private void AttachRefinedGoat()
+        {
+            if (!torso) return;
+            var model = torso.Find("Refined FBX goat");
+            if (!model)
+            {
+                var prefab = Resources.Load<GameObject>("GoatDuoRefined");
+                if (!prefab) return;
+                model = Instantiate(prefab, torso, false).transform;
+                model.name = "Refined FBX goat";
+                model.localPosition = Vector3.zero;
+                model.localRotation = Quaternion.identity;
+                model.localScale = Vector3.one * .78f;
+            }
+            // The old stylized parts remain as fragments for the comic crash effect.
+            foreach (var renderer in torso.GetComponentsInChildren<MeshRenderer>())
+                if (!renderer.transform.IsChildOf(model)) renderer.enabled = false;
+            importedAnimation = model.GetComponentInChildren<Animation>();
+            if (importedAnimation && importedAnimation["Goat_Idle"] != null)
+            {
+                importedAnimation["Goat_Idle"].wrapMode = WrapMode.Loop;
+                if (importedAnimation["Goat_Walk"] != null)
+                    importedAnimation["Goat_Walk"].wrapMode = WrapMode.Loop;
+                importedAnimation.Play("Goat_Idle");
+            }
         }
 
         private static Transform NewPivot(string name, Transform parent, Vector3 position)
@@ -209,6 +239,7 @@ namespace GoatDescent
                     BuildVisual();
                 }
                 CacheRig();
+                AttachRefinedGoat();
             }
 
             Vector3 horizontal = body.linearVelocity;
@@ -231,7 +262,8 @@ namespace GoatDescent
             float pitchTarget = Mathf.Clamp(-localAcceleration.z * 1.5f - body.linearVelocity.y * 1.2f, -26f, 26f);
             float rollTarget = Mathf.Clamp(localAcceleration.x * 2.2f, -24f, 24f);
             Spring(ref torsoPitch, ref torsoPitchSpeed, pitchTarget + impactJolt, 11f, .48f, step);
-            Spring(ref torsoRoll, ref torsoRollSpeed, rollTarget, 10f, .5f, step);
+            var balance = GetComponent<GoatSlopeBalance>();
+            Spring(ref torsoRoll, ref torsoRollSpeed, rollTarget + (balance ? balance.LeanDegrees : 0f), 10f, .5f, step);
             Spring(ref headPitch, ref headPitchSpeed, -torsoPitch * .55f + impactJolt * .7f, 13f, .38f, step);
             Spring(ref headRoll, ref headRollSpeed, -torsoRoll * .65f, 12f, .45f, step);
             Spring(ref earFlop, ref earFlopSpeed, Mathf.Clamp(speed * 1.3f + Mathf.Abs(localAcceleration.z) * .8f + impactJolt, 0f, 38f), 14f, .3f, step);
@@ -271,6 +303,12 @@ namespace GoatDescent
 
             squash = Mathf.MoveTowards(squash, 0f, Time.deltaTime * 1.5f);
             visual.localScale = new Vector3(1f + squash * .35f, 1f - squash, 1f + squash * .35f);
+            if (importedAnimation)
+            {
+                string action = !grounded ? "Goat_Jump" : speed > .85f ? "Goat_Walk" : "Goat_Idle";
+                if (importedAnimation[action] != null && !importedAnimation.IsPlaying(action))
+                    importedAnimation.CrossFade(action, .13f);
+            }
         }
 
         private static void Spring(ref float value, ref float velocity, float target, float frequency, float damping, float dt)

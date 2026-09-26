@@ -43,7 +43,10 @@ namespace GoatDescent
             {
                 if (pieces.Count >= 32) break;
                 var sourceRenderer = source.GetComponent<Renderer>();
-                if (!sourceRenderer || !sourceRenderer.enabled || !source.sharedMesh) continue;
+                // When the refined FBX is visible, the hidden toy parts still supply
+                // the funny detachable fragments on impact.
+                bool refined = visual.Find("Torso Motion/Refined FBX goat");
+                if (!sourceRenderer || (!sourceRenderer.enabled && !refined) || !source.sharedMesh) continue;
                 var piece = new GameObject("Flying goat piece — " + source.name);
                 piece.layer = 2;
                 piece.transform.SetPositionAndRotation(source.transform.position, source.transform.rotation);

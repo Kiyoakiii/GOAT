@@ -29,6 +29,7 @@ namespace GoatDescent
             goat.AddComponent<GoatJumpController>().Configure(controller, detector);
             goat.AddComponent<GoatWallJumpController>().Configure(controller, detector);
             goat.AddComponent<GoatGripController>();
+            goat.AddComponent<GoatSlopeBalance>();
             goat.AddComponent<GoatLandingAssist>().Configure(body, detector);
             goat.AddComponent<GoatVisualController>().Configure(body, detector);
             goat.AddComponent<GoatSpectacle>();

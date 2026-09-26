@@ -52,12 +52,21 @@ namespace GoatDescent
             if(grip)
             {
                 float right=width-270f;
-                GUI.color=new Color(.04f,.08f,.12f,.82f);GUI.DrawTexture(new Rect(right,20,250,132),Texture2D.whiteTexture);GUI.color=Color.white;
+                GUI.color=new Color(.04f,.08f,.12f,.82f);GUI.DrawTexture(new Rect(right,20,250,178),Texture2D.whiteTexture);GUI.color=Color.white;
                 GUI.Label(new Rect(right+14,30,225,25),grip.Exhausted?"КОПЫТА СОРВАЛИСЬ":grip.IsGripping?"ДЕРЖИМСЯ КОПЫТАМИ":"ЗАПАС ЗАЦЕПА",copy);
                 GUI.color=new Color(.2f,.27f,.31f);GUI.DrawTexture(new Rect(right+14,62,220,9),Texture2D.whiteTexture);
                 GUI.color=grip.Exhausted?new Color(.92f,.35f,.25f):new Color(.9f,.73f,.38f);GUI.DrawTexture(new Rect(right+14,62,220*grip.Strength,9),Texture2D.whiteTexture);GUI.color=Color.white;
                 string hint=wall&&wall.IsAiming?$"Мышь — направление\nОтпусти E • {wall.AimTimeLeft:0.0} сек.":wall&&wall.WallNearby?$"Зажми E для отскока\nОсталось отскоков: {wall.JumpsLeft}":"Отпусти Ctrl на полке,\nчтобы восстановить зацеп.";
                 GUI.Label(new Rect(right+14,84,225,59),hint,copy);
+                var balance=goat.GetComponent<GoatSlopeBalance>();
+                if(balance)
+                {
+                    GUI.Label(new Rect(right+14,147,225,22),$"БАЛАНС • копыта {balance.HoovesHolding}/4",copy);
+                    GUI.color=new Color(.2f,.27f,.31f);GUI.DrawTexture(new Rect(right+14,175,220,9),Texture2D.whiteTexture);
+                    GUI.color=Color.Lerp(new Color(.94f,.33f,.23f),new Color(.46f,.82f,.55f),balance.Balance01);
+                    GUI.DrawTexture(new Rect(right+14,175,220*balance.Balance01,9),Texture2D.whiteTexture);
+                    GUI.color=Color.white;
+                }
             }
             if(Time.unscaledTime<noticeUntil)GUI.Label(new Rect(width*.5f-260,height-80,520,42),notice,copy);
             GUI.matrix=matrix;

@@ -4,16 +4,16 @@ using UnityEngine.Rendering;
 
 namespace GoatDescent
 {
-    // Authored Kenney models, arranged deterministically around the playable heightfield.
+    // Models from Kenney and the original GOAT main branch, placed around the playable heightfield.
     public static class MountainAssetScenery
     {
         public static void Build(Transform mountain, MountainArt art)
         {
             var root = new GameObject("KENNEY — alpine forest and crags").transform;
             root.SetParent(mountain, false);
-            var trees = Load("tree_pineTallA_detailed", "tree_pineTallB_detailed",
+            var trees = LoadKenney("tree_pineTallA_detailed", "tree_pineTallB_detailed",
                 "tree_pineTallC_detailed", "tree_pineTallD_detailed", "tree_pineSmallA");
-            var rocks = Load("rock_largeA", "rock_largeB", "rock_largeC", "rock_largeD",
+            var rocks = LoadKenney("rock_largeA", "rock_largeB", "rock_largeC", "rock_largeD",
                 "rock_tallA", "rock_tallC", "rock_tallF", "stone_smallFlatA");
             var needles = art.Mat(new Color(.14f, .29f, .27f));
             var bark = art.Mat(new Color(.27f, .22f, .19f));
@@ -47,14 +47,51 @@ namespace GoatDescent
                 Place(trees, SteepMountain.Center(-55f) + side * 30f, -51f, 8f, true,
                     random, root, needles, bark, snow, stone);
             }
+
+            // Larger silhouettes from the original project's authored FBX pack.
+            // They frame three memorable sections without adding invisible obstacles.
+            var mainTrees = LoadFrom("MainModels/", "Tree_Fir", "Tree_Pine_Windbent");
+            var deadTrees = LoadFrom("MainModels/", "Tree_Dead");
+            var mainCliffs = LoadFrom("MainModels/", "Cliff_Broken", "Cliff_Corner", "Cliff_Tall", "Cliff_Wide");
+            var mainBoulders = LoadFrom("MainModels/", "Mountain_Boulder", "Rock_Large", "Rock_Medium");
+            var crags = new GameObject("Original GOAT crags and pines").transform;
+            crags.SetParent(root, false);
+            foreach (float side in new[] { -1f, 1f })
+            {
+                Place(mainTrees, SteepMountain.Center(-66f) + side * 22f, -71f, 13f,
+                    true, random, crags, needles, bark, snow, stone);
+                Place(mainCliffs, SteepMountain.Center(-40f) + side * 35f, -37f, 16f,
+                    false, random, crags, needles, bark, snow, stone);
+                Place(mainBoulders, SteepMountain.Center(55f) + side * 37f, 55f, 10f,
+                    false, random, crags, needles, bark, snow, stone);
+                Place(mainCliffs, SteepMountain.Center(116f) + side * 43f, 116f, 19f,
+                    false, random, crags, needles, bark, snow, stone);
+                Place(mainTrees, SteepMountain.Center(230f) + side * 37f, 230f, 16f,
+                    true, random, crags, needles, bark, snow, stone);
+            }
+            for (int i = 0; i < 28; i++)
+            {
+                float z = Range(random, -45f, 325f);
+                float side = random.Next(2) == 0 ? -1f : 1f;
+                float x = SteepMountain.Center(z) + side * Range(random, 38f, 77f);
+                if (Mathf.Abs(x) > 96f) continue;
+                bool tree = z > 145f && random.NextDouble() < .65;
+                var models = tree ? mainTrees : (z < 28f && random.NextDouble() < .18
+                    ? deadTrees : (random.NextDouble() < .45 ? mainBoulders : mainCliffs));
+                Place(models, x, z, tree ? Range(random, 10f, 17f) : Range(random, 8f, 20f),
+                    tree || models == deadTrees, random, crags, needles, bark, snow, stone);
+            }
         }
 
-        private static List<GameObject> Load(params string[] names)
+        private static List<GameObject> LoadKenney(params string[] names)
+            => LoadFrom("KenneyNature/", names);
+
+        private static List<GameObject> LoadFrom(string folder, params string[] names)
         {
             var result = new List<GameObject>();
             foreach (string name in names)
             {
-                var model = Resources.Load<GameObject>("KenneyNature/" + name);
+                var model = Resources.Load<GameObject>(folder + name);
                 if (model) result.Add(model);
                 else Debug.LogWarning("Missing Kenney scenery model: " + name);
             }
@@ -83,11 +120,21 @@ namespace GoatDescent
             foreach (var renderer in renderers)
             {
                 bounds.Encapsulate(renderer.bounds);
+                // Imported FBX files include LOD0/1/2 meshes. Draw only the highest
+                // detail level; the other levels are separate overlapping children.
+                string rendererName = renderer.name.ToUpperInvariant();
+                if (rendererName.Contains("LOD1") || rendererName.Contains("LOD2") ||
+                    rendererName.Contains("LOD3"))
+                {
+                    renderer.enabled = false;
+                    continue;
+                }
                 var materials = renderer.sharedMaterials;
                 for (int i = 0; i < materials.Length; i++)
                 {
                     string name = materials[i] ? materials[i].name.ToLowerInvariant() : "";
-                    materials[i] = tree ? (name.Contains("wood") ? bark : needles)
+                    materials[i] = tree ? (name.Contains("wood") || name.Contains("bark") ||
+                        name.Contains("trunk") ? bark : needles)
                         : (name.Contains("grass") ? snow : stone);
                 }
                 renderer.sharedMaterials = materials;
