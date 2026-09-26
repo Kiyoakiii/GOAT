@@ -13,9 +13,14 @@ namespace GoatDescent
         private void OnCollisionEnter(Collision collision)
         {
             CacheComponents();
-            if (!body || Time.time - lastLanding < landingCooldown || collision.contactCount == 0) return;
+            if (!body || body.isKinematic || Time.time - lastLanding < landingCooldown || collision.contactCount == 0) return;
             var normal = collision.GetContact(0).normal;
             float intoSurface = Vector3.Dot(body.linearVelocity, normal);
+            if (normal.y > .5f && collision.relativeVelocity.magnitude > 1.5f)
+            {
+                GetComponent<GoatVisualController>()?.PlayLanding(collision.relativeVelocity.magnitude);
+                GetComponent<GoatSpectacle>()?.Land(collision.relativeVelocity.magnitude);
+            }
             if (intoSurface < -1f)
             {
                 body.linearVelocity -= normal * intoSurface * normalVelocityDamping;

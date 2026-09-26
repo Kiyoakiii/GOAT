@@ -2,6 +2,7 @@ using UnityEngine;
 
 namespace GoatDescent
 {
+    [DefaultExecutionOrder(-100)]
     public sealed class GoatGroundDetector : MonoBehaviour
     {
         [SerializeField] private float probeRadius = .42f;

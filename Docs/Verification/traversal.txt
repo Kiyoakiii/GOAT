@@ -1,0 +1,20 @@
+PASS Cannot aim without a nearby steep face
+PASS Authored upper terrain supplies a usable grip face
+PASS Holding grip catches the actual mountain face
+PASS Grip slows a downward fall
+PASS Grip consumes stamina
+INFO grip speed=0,469983 strength=0,7099693 position=(-21.11, 301.80, -27.88)
+PASS Prolonged grip exhausts and releases
+PASS Safe shelf restores grip stamina
+PASS Aiming starts on mountain face
+PASS Aiming engages temporary slow motion
+PASS Release launches the goat
+PASS Launch follows chosen direction and elevation
+PASS Release restores time and consumes one wall jump
+PASS Flight preserves wall-jump momentum without input
+PASS Aim can start again after reset
+PASS Respawn cancels aim and restores normal time
+PASS Respawn restores grip and jump resources
+PASS Aim timeout automatically releases, preventing unlimited wall hanging
+PASS Timeout clears slow motion
+PASS Aim cancellation preserves training slow motion

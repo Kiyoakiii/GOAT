@@ -1,0 +1,17 @@
+PASS Terrain really has an open crevasse
+PASS Alpine material imported without shader errors
+PASS Three checkpoint targets spawned
+PASS Cannot skip straight to final checkpoint
+PASS Fall restores current checkpoint and records penalty
+PASS Physical jump crosses crevasse and activates its goal
+PASS Landing shelf rejects a visit without wall kick
+PASS Grounded landing after wall kick completes stage
+PASS Third goal completes ordered route
+PASS Finish awards completed run
+PASS Full restart resets progress
+PASS Physical high-speed wall impact explodes goat
+PASS Explosion suspends player physics
+PASS Explosion uses detached model geometry
+PASS Explosion recovers physics automatically
+PASS Explosion charges one fall only
+PASS Explosion returns to active checkpoint

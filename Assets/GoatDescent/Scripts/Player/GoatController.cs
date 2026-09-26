@@ -16,6 +16,8 @@ namespace GoatDescent
         private GoatGroundDetector ground;
         private Transform cameraTransform;
         private Vector2 input;
+        private GoatGripController grip;
+        private GoatWallJumpController wall;
 
         public Vector3 Velocity => body ? body.linearVelocity : Vector3.zero;
         public bool Grounded => ground && ground.IsGrounded;
@@ -44,21 +46,37 @@ namespace GoatDescent
         {
             CacheComponents();
             if (!body || !ground) return;
+            grip ??= GetComponent<GoatGripController>();
+            wall ??= GetComponent<GoatWallJumpController>();
+            if (body.isKinematic || (grip && grip.IsGripping) || (wall && wall.IsAiming)) return;
             cameraTransform ??= Camera.main ? Camera.main.transform : null;
             Vector3 forward = cameraTransform ? Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized : Vector3.forward;
             Vector3 right = cameraTransform ? Vector3.ProjectOnPlane(cameraTransform.right, Vector3.up).normalized : Vector3.right;
             Vector3 desired = (forward * input.y + right * input.x); if (desired.sqrMagnitude > 1f) desired.Normalize();
+            if (!ground.IsGrounded)
+            {
+                // Keep takeoff momentum; keys steer the flight instead of automatically braking it.
+                if (desired.sqrMagnitude > .01f) body.AddForce(desired * airAcceleration, ForceMode.Acceleration);
+                return;
+            }
             Vector3 surfaceNormal = ground.IsGrounded ? ground.GroundNormal : Vector3.up;
             if (ground.IsGrounded) desired = Vector3.ProjectOnPlane(desired, surfaceNormal).normalized;
+            bool braking = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+            if (grip && grip.Exhausted && ground.SlopeAngle >= 35f) braking = false;
+            float downhillSpeed = ground.IsGrounded ? Mathf.InverseLerp(12f, 70f, ground.SlopeAngle) * 22f : 0f;
+            if (braking) downhillSpeed *= .28f;
+            Vector3 downhill = ground.IsGrounded ? Vector3.ProjectOnPlane(Vector3.down, surfaceNormal).normalized : Vector3.zero;
             float topSpeed = maxGroundSpeed * (ground.IsGrounded && ground.SlopeAngle > steepGripAngle ? steepSpeedMultiplier : 1f);
             Vector3 velocityOnSurface = Vector3.ProjectOnPlane(body.linearVelocity, surfaceNormal);
-            Vector3 wantedVelocity = desired * topSpeed;
-            float acceleration = ground.IsGrounded ? groundAcceleration : airAcceleration;
+            Vector3 wantedVelocity = desired * topSpeed + downhill * downhillSpeed;
+            float acceleration = ground.IsGrounded
+                ? (braking ? 32f : Mathf.Lerp(groundAcceleration, 12f, Mathf.InverseLerp(28f, 65f, ground.SlopeAngle)))
+                : airAcceleration;
             Vector3 change = Vector3.ClampMagnitude(wantedVelocity - velocityOnSurface, acceleration * Time.fixedDeltaTime);
             // Write the controlled tangential velocity directly. ForceMode.VelocityChange can be swallowed by a
             // freshly-resting contact in PhysX, which looks like WASD has stopped working on a ledge.
             body.linearVelocity += change;
-            if (ground.IsGrounded && ground.SlopeAngle > slideAngle)
+            if (ground.IsGrounded && ground.SlopeAngle > slideAngle && !braking)
             {
                 Vector3 slide = Vector3.ProjectOnPlane(Vector3.down, surfaceNormal).normalized;
                 body.AddForce(slide * (ground.SlopeAngle - slideAngle) * 1.7f, ForceMode.Acceleration);
@@ -68,8 +86,26 @@ namespace GoatDescent
         public void Jump(float jumpVelocity)
         {
             if (!body) return;
+            GetComponent<GoatGripController>()?.ReleaseForJump();
             body.linearVelocity = new Vector3(body.linearVelocity.x, Mathf.Max(0, body.linearVelocity.y), body.linearVelocity.z);
             body.AddForce(Vector3.up * jumpVelocity, ForceMode.VelocityChange);
+        }
+
+        public void Stomp(float fallVelocity)
+        {
+            if (!body) return;
+            GetComponent<GoatGripController>()?.ReleaseForJump();
+            var velocity = body.linearVelocity;
+            velocity.y = -fallVelocity;
+            body.linearVelocity = velocity;
+        }
+
+        public void WallJump(Vector3 wallNormal, float upwardVelocity, float outwardVelocity)
+        {
+            if (!body) return;
+            Vector3 velocity = Vector3.ProjectOnPlane(body.linearVelocity, wallNormal);
+            velocity.y = Mathf.Max(0f, velocity.y);
+            body.linearVelocity = velocity + Vector3.up * upwardVelocity + wallNormal * outwardVelocity;
         }
     }
 }

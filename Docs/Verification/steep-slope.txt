@@ -1,0 +1,13 @@
+PASS Mountain has over 320 metres of vertical relief
+PASS Sustained steep slopes and near-vertical drops exist
+PASS No active bumpers
+PASS No old finish gate
+PASS Mountain is the only collidable environment object (count=1)
+PASS Summit spawn is supported by terrain
+PASS Terrain shader compiles
+PASS Slope accelerates goat downhill without forward input
+PASS Ordinary steep sliding does not explode goat
+PASS Respawn returns directly to summit
+PASS Cartoon explosion remains available
+PASS Explosion recovers player physics
+PASS Explosion returns to summit, not checkpoint
