@@ -7,8 +7,8 @@ namespace GoatDescent
     {
         [Header("Heavy, springy movement")]
         [SerializeField] private float maxGroundSpeed = 5.35f;
-        [SerializeField] private float groundAcceleration = 25f;
-        [SerializeField] private float airAcceleration = 6.5f;
+        [SerializeField] private float groundAcceleration = 19f;
+        [SerializeField] private float airAcceleration = 5f;
         [SerializeField] private float steepGripAngle = 60f;
         [SerializeField] private float slideAngle = 65f;
         [SerializeField] private float steepSpeedMultiplier = .7f;
@@ -48,7 +48,8 @@ namespace GoatDescent
             if (!body || !ground) return;
             grip ??= GetComponent<GoatGripController>();
             wall ??= GetComponent<GoatWallJumpController>();
-            if (body.isKinematic || (grip && grip.IsGripping) || (wall && wall.IsAiming)) return;
+            if (body.isKinematic || (grip && grip.IsGripping) || (wall && wall.IsAiming)
+                || GetComponent<GoatSlopeBalance>()?.IsSlipping == true) return;
             cameraTransform ??= Camera.main ? Camera.main.transform : null;
             Vector3 forward = cameraTransform ? Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized : Vector3.forward;
             Vector3 right = cameraTransform ? Vector3.ProjectOnPlane(cameraTransform.right, Vector3.up).normalized : Vector3.right;
@@ -87,7 +88,8 @@ namespace GoatDescent
         {
             if (!body) return;
             GetComponent<GoatGripController>()?.ReleaseForJump();
-            body.linearVelocity = new Vector3(body.linearVelocity.x, Mathf.Max(0, body.linearVelocity.y), body.linearVelocity.z);
+            body.linearVelocity = new Vector3(body.linearVelocity.x * .76f,
+                Mathf.Max(0, body.linearVelocity.y), body.linearVelocity.z * .76f);
             body.AddForce(Vector3.up * jumpVelocity, ForceMode.VelocityChange);
         }
 

@@ -4,11 +4,11 @@ namespace GoatDescent
 {
     public sealed class GoatJumpController : MonoBehaviour
     {
-        [SerializeField] private float jumpVelocity = 5.15f;
-        [SerializeField] private float rocketJumpVelocity = 8.2f;
-        [SerializeField] private float airJumpVelocity = 4.5f;
+        [SerializeField] private float jumpVelocity = 4.35f;
+        [SerializeField] private float rocketJumpVelocity = 6.7f;
+        [SerializeField] private float airJumpVelocity = 3.5f;
         [SerializeField] private float stompFallVelocity = 13f;
-        [SerializeField] private float stompBounceVelocity = 6.5f;
+        [SerializeField] private float stompBounceVelocity = 5.2f;
         [SerializeField] private float coyoteTime = .12f;
         [SerializeField] private float jumpBuffer = .15f;
 
@@ -48,6 +48,7 @@ namespace GoatDescent
             CacheComponents();
             if (!controller || !ground) return;
             if (GetComponent<GoatWallJumpController>()?.IsAiming == true) return;
+            if (GetComponent<GoatSlopeBalance>()?.IsSlipping == true) return;
 
             bool grounded = ground.IsGrounded;
             if (grounded) lastGrounded = Time.time;

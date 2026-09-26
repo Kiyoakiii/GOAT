@@ -4,7 +4,7 @@ namespace GoatDescent
 {
     public sealed class GoatLandingAssist : MonoBehaviour
     {
-        [SerializeField] private float normalVelocityDamping = .7f;
+        [SerializeField] private float normalVelocityDamping = .82f;
         [SerializeField] private float landingCooldown = .12f;
         private Rigidbody body; private GoatGroundDetector ground; private float lastLanding = -10f;
         public void Configure(Rigidbody targetBody, GoatGroundDetector targetGround) { body = targetBody; ground = targetGround; }

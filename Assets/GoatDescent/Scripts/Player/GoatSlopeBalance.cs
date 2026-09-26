@@ -14,11 +14,13 @@ namespace GoatDescent
         private GoatGroundDetector ground;
         private float fallTime;
         private float catchCooldown;
+        private float slipUntil;
         private float lean;
 
         public float Balance01 { get; private set; } = 1f;
         public int HoovesHolding { get; private set; }
         public float LeanDegrees => lean;
+        public bool IsSlipping => Time.time < slipUntil;
         public bool HoofHolds(int index) => index >= 0 && index < hoofHolding.Length && hoofHolding[index];
 
         private void Awake()
@@ -33,14 +35,21 @@ namespace GoatDescent
             HoovesHolding = 0;
             fallTime = 0f;
             catchCooldown = 0f;
+            slipUntil = -100f;
             lean = 0f;
             for (int i = 0; i < hoofHolding.Length; i++) hoofHolding[i] = false;
         }
 
         private void FixedUpdate()
         {
+            if (IsSlipping)
+            {
+                HoovesHolding = 0;
+                Balance01 = .16f;
+                return;
+            }
             if (!body || !ground || body.isKinematic || !ground.IsGrounded ||
-                ground.SlopeAngle < 25f || GetComponent<GoatWallJumpController>()?.IsAiming == true)
+                GetComponent<GoatWallJumpController>()?.IsAiming == true)
             {
                 Balance01 = Mathf.MoveTowards(Balance01, 1f, Time.fixedDeltaTime * 1.6f);
                 HoovesHolding = 0;
@@ -48,7 +57,6 @@ namespace GoatDescent
                 lean = Mathf.MoveTowards(lean, 0f, Time.fixedDeltaTime * 65f);
                 return;
             }
-
             Vector3 normal = ground.GroundNormal;
             Vector3 forward = Vector3.ProjectOnPlane(body.linearVelocity, normal);
             if (forward.sqrMagnitude < 1f) forward = Vector3.ProjectOnPlane(Vector3.forward, normal);
@@ -65,7 +73,8 @@ namespace GoatDescent
                 float end = i < 2 ? .43f : -.43f;
                 Vector3 foot = center + right * side + forward * end;
                 bool holding = Physics.Raycast(foot + normal * .85f, -normal, out var hit,
-                    1.8f, mask, QueryTriggerInteraction.Ignore) && hit.collider.GetComponent<MountainSlopeSurface>();
+                    1.45f, mask, QueryTriggerInteraction.Ignore)
+                    && hit.collider.GetComponent<MountainSlopeSurface>() && hit.normal.y > .52f;
                 hoofHolding[i] = holding;
                 if (!holding) continue;
                 hoofPoints[i] = hit.point;
@@ -78,7 +87,10 @@ namespace GoatDescent
 
             if (HoovesHolding == 0)
             {
-                Balance01 = Mathf.MoveTowards(Balance01, .18f, Time.fixedDeltaTime * 2f);
+                Balance01 = Mathf.MoveTowards(Balance01, .05f, Time.fixedDeltaTime * 3f);
+                fallTime += Time.fixedDeltaTime;
+                if (fallTime > .3f && Time.time >= catchCooldown)
+                    Slip(right, Vector3.ProjectOnPlane(Vector3.down, normal), body.linearVelocity.x);
                 return;
             }
             supportCenter /= HoovesHolding;
@@ -90,15 +102,15 @@ namespace GoatDescent
             float midpoint = (left + rightEdge) * .5f;
             float halfSpan = Mathf.Max(.19f, (rightEdge - left) * .5f);
             float outside = Mathf.Max(0f, Mathf.Abs(offset - midpoint) / halfSpan - .75f);
-            float slopeCost = Mathf.InverseLerp(40f, 78f, ground.SlopeAngle) * .06f;
-            float speedCost = Mathf.Clamp01(body.linearVelocity.magnitude / 30f) * .07f;
-            float missingCost = (4 - HoovesHolding) * .12f;
+            float slopeCost = Mathf.InverseLerp(40f, 78f, ground.SlopeAngle) * .11f;
+            float speedCost = Mathf.InverseLerp(5f, 14f, body.linearVelocity.magnitude) * .1f;
+            float missingCost = (4 - HoovesHolding) * .22f;
             bool braking = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            float recklessTurn = Mathf.Abs(steering) * Mathf.InverseLerp(8f, 18f, body.linearVelocity.magnitude)
-                * (braking ? .25f : 1f) * .21f;
-            float target = Mathf.Clamp01(1f - outside * .50f - slopeCost - speedCost
+            float recklessTurn = Mathf.Abs(steering) * Mathf.InverseLerp(4f, 11f, body.linearVelocity.magnitude)
+                * (braking ? .2f : 1f) * .23f;
+            float target = Mathf.Clamp01(1f - outside * .7f - slopeCost - speedCost
                 - missingCost - recklessTurn);
-            Balance01 = Mathf.MoveTowards(Balance01, target, Time.fixedDeltaTime * 2.4f);
+            Balance01 = Mathf.MoveTowards(Balance01, target, Time.fixedDeltaTime * 2.8f);
             lean = Mathf.MoveTowards(lean, Mathf.Clamp(-(offset - midpoint) * 38f, -22f, 22f),
                 Time.fixedDeltaTime * 70f);
 
@@ -107,18 +119,24 @@ namespace GoatDescent
                 float direction = Mathf.Sign(offset - midpoint);
                 body.AddForce(right * direction * (.28f - Balance01) * 10f, ForceMode.Acceleration);
             }
-            fallTime = Balance01 < .12f ? fallTime + Time.fixedDeltaTime : 0f;
-            if (fallTime > .65f && Time.time >= catchCooldown)
+            fallTime = Balance01 < .28f ? fallTime + Time.fixedDeltaTime : 0f;
+            if (fallTime > .35f && Time.time >= catchCooldown)
             {
-                // A readable stumble: lose the foothold and get a chance to steer back.
-                body.AddForce(normal * 2.7f + right * Mathf.Sign(offset - midpoint) * 2.2f,
-                    ForceMode.VelocityChange);
-                GetComponent<GoatGripController>()?.ReleaseForJump();
-                SlopeRun.Instance?.Notify("КОПЫТА СОРВАЛИСЬ! РУЛИ ПРОТИВ ЗАНОСА");
-                fallTime = 0f;
-                catchCooldown = Time.time + 1.4f;
-                Balance01 = .48f;
+                Slip(right, Vector3.ProjectOnPlane(Vector3.down, normal), offset - midpoint);
             }
+        }
+
+        private void Slip(Vector3 right, Vector3 downhill, float side)
+        {
+            float direction = Mathf.Abs(side) > .02f ? Mathf.Sign(side) : 1f;
+            body.AddForce(Vector3.down * 1.2f + right * direction * 2.8f
+                + downhill.normalized * 1.6f, ForceMode.VelocityChange);
+            GetComponent<GoatGripController>()?.ReleaseForJump();
+            SlopeRun.Instance?.Notify("КОПЫТА СОРВАЛИСЬ! ЛОВИ СЛЕДУЮЩУЮ ПОЛКУ");
+            fallTime = 0f;
+            slipUntil = Time.time + .48f;
+            catchCooldown = Time.time + 1.6f;
+            Balance01 = .16f;
         }
     }
 }
