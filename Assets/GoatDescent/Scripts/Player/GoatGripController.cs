@@ -101,13 +101,13 @@ namespace GoatDescent
                 IsGripping = true;
                 SurfaceNormal = superHit.normal;
                 superCharge = Mathf.Max(0f, superCharge - Time.fixedDeltaTime);
-                Vector3 downhill = Vector3.ProjectOnPlane(Vector3.down, superHit.normal).normalized;
-                Vector3 across = Vector3.Cross(superHit.normal, Vector3.up).normalized;
+                Vector3 superDownhill = Vector3.ProjectOnPlane(Vector3.down, superHit.normal).normalized;
+                Vector3 superAcross = Vector3.Cross(superHit.normal, Vector3.up).normalized;
                 var view = Camera.main;
-                if (view && Vector3.Dot(across, view.transform.right) < 0f) across = -across;
-                float steer = (Input.GetKey(KeyCode.D) ? 1f : 0f) - (Input.GetKey(KeyCode.A) ? 1f : 0f);
-                Vector3 target = downhill * .18f + across * steer * 1.3f - superHit.normal * .2f;
-                body.linearVelocity = Vector3.MoveTowards(body.linearVelocity, target, 75f * Time.fixedDeltaTime);
+                if (view && Vector3.Dot(superAcross, view.transform.right) < 0f) superAcross = -superAcross;
+                float superSteer = (Input.GetKey(KeyCode.D) ? 1f : 0f) - (Input.GetKey(KeyCode.A) ? 1f : 0f);
+                Vector3 superVelocity = superDownhill * .18f + superAcross * superSteer * 1.3f - superHit.normal * .2f;
+                body.linearVelocity = Vector3.MoveTowards(body.linearVelocity, superVelocity, 75f * Time.fixedDeltaTime);
                 body.AddForce(-Physics.gravity, ForceMode.Acceleration);
                 return;
             }
