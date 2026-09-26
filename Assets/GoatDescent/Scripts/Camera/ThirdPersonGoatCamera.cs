@@ -32,11 +32,11 @@ namespace GoatDescent
         public void SetPitch(float degrees) { pitch = Mathf.Clamp(degrees, minPitch, maxPitch); Snap(); }
         public void SetTestCliffView()
         {
-            distance = 8f;
-            height = 4.5f;
-            lookAheadDistance = 6f;
-            lookDownOffset = 2f;
-            pitch = 45f;
+            distance = 6.4f;
+            height = 2.1f;
+            lookAheadDistance = 3.5f;
+            lookDownOffset = .7f;
+            pitch = 14f;
             Snap();
         }
         public void Configure(Transform newTarget, float initialYaw)

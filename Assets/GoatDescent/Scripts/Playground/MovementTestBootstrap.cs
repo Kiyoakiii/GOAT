@@ -13,7 +13,6 @@ namespace GoatDescent
             var marker = GameObject.Find("Goat Spawn");
             Vector3 spawn = marker ? marker.transform.position : new Vector3(0f, 0.12f, -9f);
             GoatPlayerFactory.Create(spawn);
-            gameObject.AddComponent<MovementTestTimeControls>();
         }
     }
 }

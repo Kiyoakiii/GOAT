@@ -19,7 +19,7 @@ namespace GoatDescent
             body.constraints = RigidbodyConstraints.FreezeRotation;
 
             var capsule = goat.AddComponent<CapsuleCollider>();
-            capsule.radius = .48f;
+            capsule.radius = .34f;
             capsule.height = 1.15f;
             capsule.center = new Vector3(0f, .58f, 0f);
 
@@ -27,14 +27,11 @@ namespace GoatDescent
             var controller = goat.AddComponent<GoatController>();
             controller.Configure(body, detector);
             goat.AddComponent<GoatJumpController>().Configure(controller, detector);
-            goat.AddComponent<GoatWallJumpController>().Configure(controller, detector);
             goat.AddComponent<GoatGripController>();
             goat.AddComponent<GoatSlopeBalance>();
             goat.AddComponent<GoatLandingAssist>().Configure(body, detector);
             goat.AddComponent<GoatVisualController>().Configure(body, detector);
             goat.AddComponent<GoatSpectacle>();
-            goat.AddComponent<GoatRainbowDash>();
-            goat.AddComponent<GoatCrashExplosion>();
             goat.AddComponent<RespawnController>().Configure(body, spawn);
 
             var camera = Camera.main;

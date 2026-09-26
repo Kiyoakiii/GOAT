@@ -29,22 +29,15 @@ namespace GoatDescent
     [DefaultExecutionOrder(-30)]
     public sealed class GoatGripController : MonoBehaviour
     {
-        private const float Capacity = 2.2f;
         private Rigidbody body;
         private GoatGroundDetector ground;
-        private GoatWallJumpController wall;
-        private bool held;
-        private float remaining = Capacity, releasedUntil;
         private float superCharge = 1.15f, superReleasedUntil;
         private TrailRenderer leftTrace, rightTrace;
         private Material traceMaterial;
         public bool IsGripping { get; private set; }
         public bool SuperActive { get; private set; }
         public float SuperCharge01 => superCharge / 1.15f;
-        public bool Exhausted { get; private set; }
-        public float Strength => remaining / Capacity;
         public Vector3 SurfaceNormal { get; private set; }
-        public void SetGripHeld(bool value) { held = value; if (!value) IsGripping = false; }
         private void Awake() { body = GetComponent<Rigidbody>(); ground = GetComponent<GoatGroundDetector>(); }
         private void Start()
         {
@@ -64,26 +57,21 @@ namespace GoatDescent
         {
             if (leftTrace) leftTrace.emitting = IsGripping || SuperActive;
             if (rightTrace) rightTrace.emitting = IsGripping || SuperActive;
-            if (Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.RightControl)) SetGripHeld(true);
-            if ((Input.GetKeyUp(KeyCode.LeftControl) || Input.GetKeyUp(KeyCode.RightControl))
-                && !Input.GetKey(KeyCode.LeftControl) && !Input.GetKey(KeyCode.RightControl)) SetGripHeld(false);
         }
         public void ReleaseForJump()
         {
             IsGripping = false; SuperActive = false;
-            releasedUntil = Time.time + .32f;
             superReleasedUntil = Time.time + .32f;
         }
         public void ResetGrip()
         {
-            held = false; IsGripping = false; Exhausted = false; remaining = Capacity; releasedUntil = -100f;
+            IsGripping = false;
             SuperActive = false; superCharge = 1.15f; superReleasedUntil = -100f;
             if(leftTrace){leftTrace.emitting=false;leftTrace.Clear();}if(rightTrace){rightTrace.emitting=false;rightTrace.Clear();}
         }
         private void FixedUpdate()
         {
-            wall ??= GetComponent<GoatWallJumpController>();
-            if (!body || body.isKinematic || (wall && wall.IsAiming))
+            if (!body || body.isKinematic)
             { IsGripping = false; SuperActive = false; return; }
             if (ground && ground.IsGrounded && ground.SlopeAngle < 30f && !SuperActive)
                 superCharge = Mathf.Min(1.15f, superCharge + Time.fixedDeltaTime * .48f);
@@ -113,32 +101,9 @@ namespace GoatDescent
             }
             if (SuperActive) superReleasedUntil = Time.time + .3f;
             SuperActive = false;
-            if (ground && ground.IsGrounded && ground.SlopeAngle < 35f && !held)
-            {
-                remaining = Mathf.Min(Capacity, remaining + Time.fixedDeltaTime * 1.4f);
-                if (remaining > Capacity * .35f) Exhausted = false;
-            }
-            IsGripping = held && !Exhausted && Time.time >= releasedUntil && GoatCliffProbe.Find(transform, out _);
-            if (!IsGripping || !GoatCliffProbe.Find(transform, out var hit)) return;
-            SurfaceNormal = hit.normal;
-            float angle = Vector3.Angle(hit.normal, Vector3.up);
-            remaining = Mathf.Max(0f, remaining - Time.fixedDeltaTime * Mathf.Lerp(.35f, 1f, Mathf.InverseLerp(38f, 78f, angle)));
-            if (remaining <= 0f)
-            {
-                Exhausted = true; IsGripping = false;
-                SlopeRun.Instance?.Notify("Копыта срываются! Прыгай или ищи полку.");
-                return;
-            }
-            Vector3 downhill = Vector3.ProjectOnPlane(Vector3.down, hit.normal).normalized;
-            Vector3 across = Vector3.Cross(hit.normal, Vector3.up).normalized;
-            var camera = Camera.main;
-            if (camera && Vector3.Dot(across, camera.transform.right) < 0f) across = -across;
-            float steer = (Input.GetKey(KeyCode.D) ? 1f : 0f) - (Input.GetKey(KeyCode.A) ? 1f : 0f);
-            Vector3 target = downhill * .65f + across * steer * 2.5f - hit.normal * .3f;
-            body.linearVelocity = Vector3.MoveTowards(body.linearVelocity, target, 65f * Time.fixedDeltaTime);
-            body.AddForce(-Physics.gravity, ForceMode.Acceleration);
+            IsGripping = false;
         }
-        private void OnDisable() { held = false; IsGripping = false; SuperActive = false; }
+        private void OnDisable() { IsGripping = false; SuperActive = false; }
         private void OnDestroy() { if(traceMaterial)Destroy(traceMaterial); }
     }
 }

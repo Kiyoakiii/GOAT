@@ -5,7 +5,7 @@ namespace GoatDescent
     [DefaultExecutionOrder(-100)]
     public sealed class GoatGroundDetector : MonoBehaviour
     {
-        [SerializeField] private float probeRadius = .42f;
+        [SerializeField] private float probeRadius = .3f;
         [SerializeField] private float probeDistance = .22f;
         [SerializeField] private LayerMask groundMask = ~0;
         public bool IsGrounded { get; private set; }

@@ -10,14 +10,13 @@ namespace GoatDescent
         [SerializeField] private float groundAcceleration = 19f;
         [SerializeField] private float airAcceleration = 5f;
         [SerializeField] private float steepGripAngle = 60f;
-        [SerializeField] private float slideAngle = 65f;
-        [SerializeField] private float steepSpeedMultiplier = .7f;
+        [SerializeField] private float slideAngle = 74f;
+        [SerializeField] private float steepSpeedMultiplier = .85f;
         private Rigidbody body;
         private GoatGroundDetector ground;
         private Transform cameraTransform;
         private Vector2 input;
         private GoatGripController grip;
-        private GoatWallJumpController wall;
 
         public Vector3 Velocity => body ? body.linearVelocity : Vector3.zero;
         public bool Grounded => ground && ground.IsGrounded;
@@ -47,8 +46,7 @@ namespace GoatDescent
             CacheComponents();
             if (!body || !ground) return;
             grip ??= GetComponent<GoatGripController>();
-            wall ??= GetComponent<GoatWallJumpController>();
-            if (body.isKinematic || (grip && (grip.IsGripping || grip.SuperActive)) || (wall && wall.IsAiming)
+            if (body.isKinematic || (grip && grip.SuperActive)
                 || GetComponent<GoatSlopeBalance>()?.IsSlipping == true) return;
             cameraTransform ??= Camera.main ? Camera.main.transform : null;
             Vector3 forward = cameraTransform ? Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized : Vector3.forward;
@@ -63,9 +61,12 @@ namespace GoatDescent
             Vector3 surfaceNormal = ground.IsGrounded ? ground.GroundNormal : Vector3.up;
             if (ground.IsGrounded) desired = Vector3.ProjectOnPlane(desired, surfaceNormal).normalized;
             bool braking = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            if (grip && grip.Exhausted && ground.SlopeAngle >= 35f) braking = false;
-            float downhillSpeed = ground.IsGrounded ? Mathf.InverseLerp(12f, 70f, ground.SlopeAngle) * 22f : 0f;
+            float downhillSpeed = ground.IsGrounded ? Mathf.InverseLerp(12f, 70f, ground.SlopeAngle) * 15f : 0f;
             if (braking) downhillSpeed *= .28f;
+            var balance = GetComponent<GoatSlopeBalance>();
+            if (balance && balance.HoovesHolding >= 3 && input.y <= 0f
+                && body.linearVelocity.magnitude < 2.5f)
+                downhillSpeed *= .2f;
             Vector3 downhill = ground.IsGrounded ? Vector3.ProjectOnPlane(Vector3.down, surfaceNormal).normalized : Vector3.zero;
             float topSpeed = maxGroundSpeed * (ground.IsGrounded && ground.SlopeAngle > steepGripAngle ? steepSpeedMultiplier : 1f);
             Vector3 velocityOnSurface = Vector3.ProjectOnPlane(body.linearVelocity, surfaceNormal);

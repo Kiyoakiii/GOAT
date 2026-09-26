@@ -33,6 +33,9 @@ namespace GoatDescent
         private float earFlop, earFlopSpeed;
         private float tailSwing, tailSwingSpeed;
         private float impactJolt;
+        private bool preparingJump;
+
+        public void SetJumpPreparation(bool value) => preparingJump = value;
 
         public void Configure(Rigidbody targetBody, GoatGroundDetector targetGround)
         {
@@ -288,8 +291,11 @@ namespace GoatDescent
                 if (!grounded && body.linearVelocity.y < -3f)
                     tumble += Time.deltaTime * Mathf.Min(150f, -body.linearVelocity.y * 14f);
                 else tumble = Mathf.MoveTowardsAngle(tumble, 0f, Time.deltaTime * 400f);
-                torso.localPosition = new Vector3(0f, bob + Mathf.Sin(Time.time * 2.3f) * .008f, 0f);
-                torso.localRotation = Quaternion.Euler((grounded ? Mathf.Sin(walkCycle) * gaitWeight * 3f : -5f) + tumble + torsoPitch, 0f, (grounded ? Mathf.Cos(walkCycle) * gaitWeight * 2f : 0f) + torsoRoll);
+                torso.localPosition = new Vector3(0f, bob + Mathf.Sin(Time.time * 2.3f) * .008f
+                    - (preparingJump && grounded ? .13f : 0f), 0f);
+                torso.localRotation = Quaternion.Euler((grounded ? Mathf.Sin(walkCycle) * gaitWeight * 3f : -5f)
+                    + tumble + torsoPitch + (preparingJump && grounded ? 7f : 0f), 0f,
+                    (grounded ? Mathf.Cos(walkCycle) * gaitWeight * 2f : 0f) + torsoRoll);
             }
             if (headPivot) headPivot.localRotation = Quaternion.Euler(headPitch + Mathf.Sin(Time.time * 2.5f) * 2f, 0f, headRoll);
             if (tailPivot) tailPivot.localRotation = Quaternion.Euler(0f, tailSwing + Mathf.Sin(Time.time * 7f) * (6f + moveAmount * 13f), 0f);

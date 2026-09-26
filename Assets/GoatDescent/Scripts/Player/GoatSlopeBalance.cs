@@ -61,8 +61,7 @@ namespace GoatDescent
                 Balance01 = .16f;
                 return;
             }
-            if (!body || !ground || body.isKinematic || !ground.IsGrounded ||
-                GetComponent<GoatWallJumpController>()?.IsAiming == true)
+            if (!body || !ground || body.isKinematic || !ground.IsGrounded)
             {
                 Balance01 = Mathf.MoveTowards(Balance01, 1f, Time.fixedDeltaTime * 1.6f);
                 HoovesHolding = 0;
@@ -87,7 +86,7 @@ namespace GoatDescent
                 Vector3 foot = center + right * side + forward * end;
                 bool holding = Physics.Raycast(foot + normal * .85f, -normal, out var hit,
                     1.45f, mask, QueryTriggerInteraction.Ignore)
-                    && hit.collider.GetComponent<MountainSlopeSurface>() && hit.normal.y > .52f;
+                    && hit.collider.GetComponent<MountainSlopeSurface>() && hit.normal.y > .32f;
                 hoofHolding[i] = holding;
                 if (!holding) continue;
                 hoofPoints[i] = hit.point;
