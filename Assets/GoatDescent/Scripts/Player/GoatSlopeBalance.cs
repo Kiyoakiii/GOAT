@@ -86,7 +86,7 @@ namespace GoatDescent
                 Vector3 foot = center + right * side + forward * end;
                 bool holding = Physics.Raycast(foot + normal * .85f, -normal, out var hit,
                     1.45f, mask, QueryTriggerInteraction.Ignore)
-                    && hit.collider.GetComponent<MountainSlopeSurface>() && hit.normal.y > .32f;
+                    && hit.collider.GetComponent<MountainSlopeSurface>() && GoatSurfaceZones.NormalSupportsHooves(hit.normal);
                 hoofHolding[i] = holding;
                 if (!holding) continue;
                 hoofPoints[i] = hit.point;
@@ -114,7 +114,7 @@ namespace GoatDescent
             float midpoint = (left + rightEdge) * .5f;
             float halfSpan = Mathf.Max(.19f, (rightEdge - left) * .5f);
             float outside = Mathf.Max(0f, Mathf.Abs(offset - midpoint) / halfSpan - .75f);
-            float slopeCost = Mathf.InverseLerp(40f, 78f, ground.SlopeAngle) * .11f;
+            float slopeCost = Mathf.InverseLerp(GoatSurfaceZones.StandMaxAngle, GoatSurfaceZones.GripMaxAngle, ground.SlopeAngle) * .18f;
             float speedCost = Mathf.InverseLerp(5f, 14f, body.linearVelocity.magnitude) * .1f;
             float missingCost = (4 - HoovesHolding) * .22f;
             bool braking = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);

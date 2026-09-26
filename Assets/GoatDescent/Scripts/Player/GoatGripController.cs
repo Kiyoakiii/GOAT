@@ -12,14 +12,16 @@ namespace GoatDescent
             int mask = layer >= 0 ? ~(1 << layer) : ~0;
             float nearest = float.MaxValue;
             var ground = goat.GetComponent<GoatGroundDetector>();
-            if (ground && ground.IsGrounded && ground.SlopeAngle >= 38f)
+            if (ground && ground.IsGrounded && ground.SlopeAngle >= GoatSurfaceZones.StandMaxAngle
+                && GoatSurfaceZones.CanGrip(ground.SlopeAngle))
             { best = ground.GroundHit; nearest = .15f; }
             Vector3 origin = goat.position + Vector3.up * .6f;
             for (int i = 0; i < 12; i++)
             {
                 Vector3 direction = Quaternion.Euler(0f, i * 30f, 0f) * Vector3.forward;
                 if (!Physics.SphereCast(origin, .12f, direction, out var hit, 1.15f, mask, QueryTriggerInteraction.Ignore)) continue;
-                if (hit.collider.transform.IsChildOf(goat) || hit.normal.y > .79f || hit.normal.y < -.2f || hit.distance >= nearest) continue;
+                if (hit.collider.transform.IsChildOf(goat) || hit.distance >= nearest) continue;
+                if (!GoatSurfaceZones.NormalIsWallLike(hit.normal) || !GoatSurfaceZones.NormalSupportsGrip(hit.normal)) continue;
                 nearest = hit.distance; best = hit;
             }
             return best.collider;

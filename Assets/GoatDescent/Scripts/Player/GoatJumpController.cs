@@ -5,6 +5,7 @@ namespace GoatDescent
     public sealed class GoatJumpController : MonoBehaviour
     {
         [SerializeField] private float jumpVelocity = 4.35f;
+        [SerializeField] private float airJumpVelocity = 3.6f;
         [SerializeField] private float coyoteTime = .2f;
         [SerializeField] private float jumpBuffer = .25f;
         [SerializeField] private float pushOffDelay = .1f;
@@ -14,6 +15,7 @@ namespace GoatDescent
         private float lastGrounded = -100f;
         private float pressedAt = -100f;
         private bool groundJumpUsed;
+        private bool airJumpUsed;
         private bool wasAirborne;
         private float trickUntil;
 
@@ -30,6 +32,7 @@ namespace GoatDescent
             pressedAt = -100f;
             lastGrounded = -100f;
             groundJumpUsed = false;
+            airJumpUsed = false;
             wasAirborne = false;
             GetComponent<GoatVisualController>()?.SetJumpPreparation(false);
             CurrentTrick = "";
@@ -56,6 +59,7 @@ namespace GoatDescent
             if (grounded && wasAirborne)
             {
                 groundJumpUsed = false;
+                airJumpUsed = false;
                 wasAirborne = false;
             }
             if (Input.GetKeyDown(KeyCode.Space))
@@ -79,6 +83,16 @@ namespace GoatDescent
                 GetComponent<GoatSpectacle>()?.Jump(false);
                 groundJumpUsed = true;
                 ShowTrick("ПРЫГ!");
+                pressedAt = -100f;
+            }
+            else if (!airJumpUsed && !ground.IsGrounded)
+            {
+                controller.Jump(airJumpVelocity);
+                GetComponent<GoatVisualController>()?.PlayTakeoff(.1f);
+                GetComponent<GoatVisualController>()?.SetJumpPreparation(false);
+                GetComponent<GoatSpectacle>()?.Jump(true);
+                airJumpUsed = true;
+                ShowTrick("ДВОЙНОЙ!");
                 pressedAt = -100f;
             }
         }

@@ -9,8 +9,8 @@ namespace GoatDescent
         [SerializeField] private float maxGroundSpeed = 5.35f;
         [SerializeField] private float groundAcceleration = 19f;
         [SerializeField] private float airAcceleration = 5f;
-        [SerializeField] private float steepGripAngle = 60f;
-        [SerializeField] private float slideAngle = 74f;
+        [SerializeField] private float steepGripAngle = 55f;
+        [SerializeField] private float slideAngle = 80f;
         [SerializeField] private float steepSpeedMultiplier = .85f;
         private Rigidbody body;
         private GoatGroundDetector ground;
@@ -78,10 +78,18 @@ namespace GoatDescent
             // Write the controlled tangential velocity directly. ForceMode.VelocityChange can be swallowed by a
             // freshly-resting contact in PhysX, which looks like WASD has stopped working on a ledge.
             body.linearVelocity += change;
-            if (ground.IsGrounded && ground.SlopeAngle > slideAngle && !braking)
+            if (ground.IsGrounded && ground.SlopeAngle > slideAngle)
+            {
+                float excess = Mathf.InverseLerp(slideAngle, 89f, ground.SlopeAngle);
+                Vector3 slide = Vector3.ProjectOnPlane(Vector3.down, surfaceNormal).normalized;
+                body.AddForce(slide * (excess * 2.6f + .5f), ForceMode.Acceleration);
+                if (excess > .55f)
+                    body.AddForce(Vector3.up * -.2f, ForceMode.Acceleration);
+            }
+            else if (ground.IsGrounded && ground.SlopeAngle > steepGripAngle && !braking)
             {
                 Vector3 slide = Vector3.ProjectOnPlane(Vector3.down, surfaceNormal).normalized;
-                body.AddForce(slide * (ground.SlopeAngle - slideAngle) * 1.7f, ForceMode.Acceleration);
+                body.AddForce(slide * (ground.SlopeAngle - steepGripAngle) * .6f, ForceMode.Acceleration);
             }
         }
 
