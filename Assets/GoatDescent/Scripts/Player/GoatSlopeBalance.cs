@@ -22,6 +22,13 @@ namespace GoatDescent
         public float LeanDegrees => lean;
         public bool IsSlipping => Time.time < slipUntil;
         public bool HoofHolds(int index) => index >= 0 && index < hoofHolding.Length && hoofHolding[index];
+        public void CatchWithSuperHooves()
+        {
+            slipUntil = -100f;
+            fallTime = 0f;
+            catchCooldown = Time.time + .8f;
+            Balance01 = Mathf.Max(Balance01, .65f);
+        }
 
         private void Awake()
         {
@@ -42,6 +49,12 @@ namespace GoatDescent
 
         private void FixedUpdate()
         {
+            if (GetComponent<GoatGripController>()?.SuperActive == true)
+            {
+                Balance01 = Mathf.MoveTowards(Balance01, .8f, Time.fixedDeltaTime * 3f);
+                fallTime = 0f;
+                return;
+            }
             if (IsSlipping)
             {
                 HoovesHolding = 0;

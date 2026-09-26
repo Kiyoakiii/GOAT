@@ -45,14 +45,14 @@ namespace GoatDescent
             GUI.color=new Color(.04f,.08f,.12f,.82f);GUI.DrawTexture(new Rect(20,20,410,help?168:91),Texture2D.whiteTexture);GUI.color=Color.white;
             GUI.Label(new Rect(35,30,390,30),Finished?"ГОРА ПРОЙДЕНА":Region(goat.transform.position.z),title);
             GUI.Label(new Rect(35,67,385,28),$"Скорость {goat.Velocity.magnitude*3.6f:0} км/ч  •  Высота {Mathf.Max(0,goat.transform.position.y):0} м  •  {(int)elapsed/60:00}:{(int)elapsed%60:00}",copy);
-            if(help)GUI.Label(new Rect(35,103,380,75),"WASD — рулить • Ctrl — зацеп копытами\nSpace — прыжок / второй прыжок\nЗажми E у скалы → мышь → отпусти E",copy);
-            GUI.Label(new Rect(23,height-33,width-46,25),"Ctrl — зацеп   •   E держать / отпустить — прицельный отскок   •   R — вершина   •   F1 — помощь",copy);
+            if(help)GUI.Label(new Rect(35,103,380,75),"WASD — рулить • Ctrl — зацеп копытами\nF — суперкопыта для спасения у скалы\nSpace — прыжок • E — прицельный отскок",copy);
+            GUI.Label(new Rect(23,height-33,width-46,25),"Ctrl — зацеп   •   F — суперкопыта   •   E — отскок   •   R — вершина   •   F1 — помощь",copy);
             var grip=goat.GetComponent<GoatGripController>();
             var wall=goat.GetComponent<GoatWallJumpController>();
             if(grip)
             {
                 float right=width-270f;
-                GUI.color=new Color(.04f,.08f,.12f,.82f);GUI.DrawTexture(new Rect(right,20,250,178),Texture2D.whiteTexture);GUI.color=Color.white;
+                GUI.color=new Color(.04f,.08f,.12f,.82f);GUI.DrawTexture(new Rect(right,20,250,216),Texture2D.whiteTexture);GUI.color=Color.white;
                 GUI.Label(new Rect(right+14,30,225,25),grip.Exhausted?"КОПЫТА СОРВАЛИСЬ":grip.IsGripping?"ДЕРЖИМСЯ КОПЫТАМИ":"ЗАПАС ЗАЦЕПА",copy);
                 GUI.color=new Color(.2f,.27f,.31f);GUI.DrawTexture(new Rect(right+14,62,220,9),Texture2D.whiteTexture);
                 GUI.color=grip.Exhausted?new Color(.92f,.35f,.25f):new Color(.9f,.73f,.38f);GUI.DrawTexture(new Rect(right+14,62,220*grip.Strength,9),Texture2D.whiteTexture);GUI.color=Color.white;
@@ -67,6 +67,10 @@ namespace GoatDescent
                     GUI.DrawTexture(new Rect(right+14,175,220*balance.Balance01,9),Texture2D.whiteTexture);
                     GUI.color=Color.white;
                 }
+                GUI.Label(new Rect(right+14,190,225,20),"СУПЕРКОПЫТА — F",copy);
+                GUI.color=new Color(.2f,.27f,.31f);GUI.DrawTexture(new Rect(right+14,215,220,9),Texture2D.whiteTexture);
+                GUI.color=new Color(.38f,.92f,.85f);GUI.DrawTexture(new Rect(right+14,215,220*grip.SuperCharge01,9),Texture2D.whiteTexture);
+                GUI.color=Color.white;
             }
             if(Time.unscaledTime<noticeUntil)GUI.Label(new Rect(width*.5f-260,height-80,520,42),notice,copy);
             GUI.matrix=matrix;

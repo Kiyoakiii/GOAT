@@ -63,6 +63,7 @@ namespace GoatDescent
         public void Stomp() => Show("HOOVES OF DOOM!", Pink, 1.7f, 20);
         public void StompBounce() => Show("MEGA BOUNCE!", Mint, 2.3f, 38);
         public void WallJump() => Show("WALL BOING!", Blue, 1.7f, 30);
+        public void SuperHooves() => Show("СУПЕРКОПЫТА! ДЕРЖИСЬ!", Mint, 1.8f, 28);
         public void RainbowDash() => Show("RAINBOW GOAT!", Pink, 2.6f, 55);
         public void Bumper() => Show("BONK!", Blue, 2.2f, 42);
         public void Crash() => Show("БА-БАХ! КОЗЁЛ ВДРЕБЕЗГИ!", Yellow, 3.4f, 55);

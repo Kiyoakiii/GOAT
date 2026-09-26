@@ -48,7 +48,7 @@ namespace GoatDescent
             if (!body || !ground) return;
             grip ??= GetComponent<GoatGripController>();
             wall ??= GetComponent<GoatWallJumpController>();
-            if (body.isKinematic || (grip && grip.IsGripping) || (wall && wall.IsAiming)
+            if (body.isKinematic || (grip && (grip.IsGripping || grip.SuperActive)) || (wall && wall.IsAiming)
                 || GetComponent<GoatSlopeBalance>()?.IsSlipping == true) return;
             cameraTransform ??= Camera.main ? Camera.main.transform : null;
             Vector3 forward = cameraTransform ? Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized : Vector3.forward;

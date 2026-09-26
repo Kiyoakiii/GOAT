@@ -150,7 +150,7 @@ namespace GoatDescent
         {
             float center = Smooth(7f, 18f, z) * Mathf.Sin((z - 7f) * .28f) * 1.15f;
             float across = x - center;
-            float edge = Smooth(WidthAt(z), WidthAt(z) + 2.35f, Mathf.Abs(across));
+            float width = WidthAt(z);
             float protrusions = .95f * Lobe(x, z, 1.15f, -5f, .85f, 1.35f)
                 + .72f * Lobe(x, z, -.38f, 3.5f, .62f, 1.0f)
                 + .92f * Lobe(x, z, .75f, 12.8f, .88f, 1.4f)
@@ -170,13 +170,20 @@ namespace GoatDescent
                 * Smooth(-11f, -7f, z) * (1f - Smooth(19f, 23f, z));
             float weathering = (Mathf.PerlinNoise(x * .19f + 27f, z * .13f + 4f) - .5f) * 1.15f
                 + Mathf.Sin(z * .37f + x * .17f) * .21f;
-            float flanks = Mathf.Max(0f, Mathf.Abs(across) - WidthAt(z) - 2.35f) * .48f;
+            float mountainSide = Mathf.Max(0f, -across - width);
+            float cliffSide = Mathf.Max(0f, across - width);
+            float highRidge = Smooth(0f, 3.5f, mountainSide) * 10f
+                + Smooth(3f, 14f, mountainSide) * 11f
+                + Smooth(2f, 10f, mountainSide) * Mathf.Sin(z * .42f + x * .29f) * 2.8f;
+            float brokenFace = Smooth(0f, 2.8f, cliffSide) * 14f
+                + cliffSide * .44f
+                - Smooth(2f, 10f, cliffSide) * Mathf.Sin(z * .52f - x * .24f) * 2f;
             float staggeredZ = z + Mathf.Sin(x * .7f + z * .31f) * .3f
                 + (Mathf.PerlinNoise(x * .48f + 19f, z * .22f + 13f) - .5f) * .22f;
             float abyss = Smooth(18.5f, 19.5f, z) * (1f - Smooth(29.2f, 30.2f, z));
             return BaseHeight(staggeredZ) + protrusions + chute + sideShelves + bank + rough
-                + weathering * Smooth(WidthAt(z), WidthAt(z) + 4f, Mathf.Abs(across))
-                - edge * 7.5f - flanks - abyss * 24f;
+                + weathering * Smooth(width, width + 4f, Mathf.Abs(across))
+                + (highRidge - brokenFace) * (1f - abyss) - abyss * 24f;
         }
 
         private void BuildCliff(MountainArt art)
@@ -217,11 +224,19 @@ namespace GoatDescent
         private void BuildScenery(MountainArt art)
         {
             var pine = Resources.Load<GameObject>("MainModels/Tree_Fir");
-            if (!pine) return;
-            PlaceScenery(pine, -9f, -7f, 5f, "Fir beside first ledge");
-            PlaceScenery(pine, 9.5f, -1f, 4.8f, "Fir beside second ledge");
-            PlaceScenery(pine, -8.7f, 7f, 5.5f, "Fir beside lower ledge");
-            PlaceScenery(pine, 9f, 15f, 5f, "Fir before the chasm");
+            if (pine)
+            {
+                PlaceScenery(pine, -9f, -7f, 5f, "Fir beside first ledge");
+                PlaceScenery(pine, 9.5f, -1f, 4.8f, "Fir beside second ledge");
+                PlaceScenery(pine, -8.7f, 7f, 5.5f, "Fir beside lower ledge");
+                PlaceScenery(pine, 9f, 15f, 5f, "Fir before the chasm");
+            }
+            var cliff = Resources.Load<GameObject>("MainModels/Cliff_Broken");
+            if (cliff)
+            {
+                PlaceScenery(cliff, -15f, -5f, 13f, "Broken mountain buttress");
+                PlaceScenery(cliff, -13f, 8f, 11f, "Jagged rock face");
+            }
         }
 
         private void BuildCaveApproach(MountainArt art)
@@ -371,7 +386,7 @@ namespace GoatDescent
                 normal = { textColor = Color.white } };
             float width = 450f;
             GUI.color = new Color(.04f, .08f, .11f, .84f);
-            GUI.DrawTexture(new Rect(18f, 18f, width, 203f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(18f, 18f, width, 246f), Texture2D.whiteTexture);
             GUI.color = Color.white;
             GUI.Label(new Rect(34f, 28f, width - 25f, 33f), "ЛАБОРАТОРИЯ БАЛАНСА", heading);
             float z = balance.transform.position.z;
@@ -397,6 +412,16 @@ namespace GoatDescent
             GUI.Label(new Rect(34f, 181f, 420f, 26f), z > 18f
                 ? "Камни осыпаются! Space — короткий прыжок   R — снова"
                 : "A/D — ищи полки   Space — прыгай   Ctrl — тормози   R — снова", body);
+            var grip = balance.GetComponent<GoatGripController>();
+            if (grip)
+            {
+                GUI.Label(new Rect(34f, 211f, 420f, 24f), "F — СУПЕРКОПЫТА: цепляйся за скалу при срыве", body);
+                GUI.color = new Color(.19f, .28f, .31f);
+                GUI.DrawTexture(new Rect(34f, 240f, 404f, 9f), Texture2D.whiteTexture);
+                GUI.color = new Color(.38f, .92f, .85f);
+                GUI.DrawTexture(new Rect(34f, 240f, 404f * grip.SuperCharge01, 9f), Texture2D.whiteTexture);
+                GUI.color = Color.white;
+            }
         }
     }
 
