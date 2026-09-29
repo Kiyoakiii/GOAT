@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/GoatDescent/Scenes/CliffBalancePrototype.unity
+    guid: cdf7d2ad72beaff4ea116a22d37cb8bc
+  - enabled: 1
     path: Assets/GoatDescent/Scenes/GoatDescentPrototype.unity
     guid: ce8f16e8ee9f1c3418be26885f49331c
   - enabled: 1
