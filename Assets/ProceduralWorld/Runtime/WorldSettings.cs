@@ -23,11 +23,9 @@ namespace GoatDescent.ProceduralWorld
         [Range(0.55f, 0.95f)] public float snowLine = 0.80f;
         [Range(0f, 1f)] public float snowTemperatureThreshold = 0.36f;
         [Range(0f, 1f)] public float snowCoverage = 0.86f;
-        [Range(0f, 2f)] public float grassDensity = 0.9f;
         [Range(5f, 55f)] public float grassSlopeLimit = 30f;
 
         [Header("Placement")]
-        [Range(0.1f, 2f)] public float vegetationDensity = 0.72f;
         [Range(0.1f, 2f)] public float rockDensity = 0.68f;
         [Range(0.1f, 2f)] public float cliffDensity = 0.58f;
         [Range(15f, 65f)] public float treeSlopeLimit = 34f;

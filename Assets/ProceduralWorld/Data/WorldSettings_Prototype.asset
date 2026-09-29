@@ -25,9 +25,7 @@ MonoBehaviour:
   snowLine: 0.8
   snowTemperatureThreshold: 0.36
   snowCoverage: 0.86
-  grassDensity: 0.9
   grassSlopeLimit: 30
-  vegetationDensity: 0.72
   rockDensity: 0.68
   cliffDensity: 0.58
   treeSlopeLimit: 34

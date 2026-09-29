@@ -9,6 +9,7 @@ namespace GoatDescent.ProceduralWorld.Editor
     {
         private const string UxmlPath = "Assets/ProceduralWorld/Editor/ProceduralWorldWindow.uxml";
         private WorldSettings settings;
+        private VegetationGenerationSettings vegetation;
         private Label statusLabel;
 
         [MenuItem("Tools/Procedural World/Open Generator")]
@@ -22,6 +23,7 @@ namespace GoatDescent.ProceduralWorld.Editor
         public void CreateGUI()
         {
             settings = ProceduralWorldEditorActions.GetOrCreateSettings();
+            vegetation = ProceduralWorldEditorActions.GetOrCreateVegetationSettings();
             rootVisualElement.Clear();
             VisualTreeAsset layout = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(UxmlPath);
             if (layout == null)
@@ -33,7 +35,7 @@ namespace GoatDescent.ProceduralWorld.Editor
             statusLabel = rootVisualElement.Q<Label>("statusLabel");
             BindFields();
             BindButtons();
-            SetStatus("Ready — changes are saved to WorldSettings.");
+            SetStatus("Ready — density changes are saved to VegetationGenerationSettings.");
         }
 
         private void BindFields()
@@ -49,7 +51,9 @@ namespace GoatDescent.ProceduralWorld.Editor
             BindFloat("snowLineField", () => settings.snowLine, value => settings.snowLine = Mathf.Clamp(value, 0.55f, 0.95f));
             BindFloat("snowTemperatureThresholdField", () => settings.snowTemperatureThreshold, value => settings.snowTemperatureThreshold = Mathf.Clamp01(value));
             BindFloat("snowCoverageField", () => settings.snowCoverage, value => settings.snowCoverage = Mathf.Clamp01(value));
-            BindFloat("grassDensityField", () => settings.grassDensity, value => settings.grassDensity = Mathf.Clamp(value, 0f, 2f));
+            BindVegetationFloat("treeDensityField", () => vegetation.treeDensity, value => vegetation.treeDensity = Mathf.Clamp01(value));
+            BindVegetationInteger("summitTreeCountField", () => vegetation.summitTreeCount, value => vegetation.summitTreeCount = Mathf.Clamp(value, 0, 200));
+            BindVegetationFloat("grassDensityField", () => vegetation.grassDensity, value => vegetation.grassDensity = Mathf.Clamp(value, 0f, 2f));
             BindFloat("grassSlopeLimitField", () => settings.grassSlopeLimit, value => settings.grassSlopeLimit = Mathf.Clamp(value, 5f, 55f));
         }
 
@@ -80,12 +84,34 @@ namespace GoatDescent.ProceduralWorld.Editor
             field.RegisterValueChangedCallback(change => ChangeSettings(() => setter(change.newValue)));
         }
 
+        private void BindVegetationInteger(string name, System.Func<int> getter, System.Action<int> setter)
+        {
+            IntegerField field = rootVisualElement.Q<IntegerField>(name);
+            field.SetValueWithoutNotify(getter());
+            field.RegisterValueChangedCallback(change => ChangeVegetationSettings(() => setter(change.newValue)));
+        }
+
+        private void BindVegetationFloat(string name, System.Func<float> getter, System.Action<float> setter)
+        {
+            FloatField field = rootVisualElement.Q<FloatField>(name);
+            field.SetValueWithoutNotify(getter());
+            field.RegisterValueChangedCallback(change => ChangeVegetationSettings(() => setter(change.newValue)));
+        }
+
         private void ChangeSettings(System.Action change)
         {
             Undo.RecordObject(settings, "Adjust procedural world settings");
             change();
             EditorUtility.SetDirty(settings);
             SetStatus("Settings changed — press Generate World to apply.");
+        }
+
+        private void ChangeVegetationSettings(System.Action change)
+        {
+            Undo.RecordObject(vegetation, "Adjust vegetation generation settings");
+            change();
+            EditorUtility.SetDirty(vegetation);
+            SetStatus("Vegetation density changed — press Generate World to apply.");
         }
 
         private void RandomizeSeed()

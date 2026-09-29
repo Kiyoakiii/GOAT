@@ -6,6 +6,7 @@
 }
 
 .window-root {
+  flex-grow: 1;
   padding: 12px;
   background-color: var(--surface);
   color: var(--text);
