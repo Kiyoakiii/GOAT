@@ -9,8 +9,8 @@ namespace GoatDescent
         [SerializeField] private float maxGroundSpeed = 5.35f;
         [SerializeField] private float groundAcceleration = 19f;
         [SerializeField] private float airAcceleration = 5f;
-        [SerializeField] private float steepGripAngle = 55f;
-        [SerializeField] private float slideAngle = 80f;
+        [SerializeField] private float steepGripAngle = 73f;
+        [SerializeField] private float slideAngle = 86f;
         [SerializeField] private float steepSpeedMultiplier = .85f;
         private Rigidbody body;
         private GoatGroundDetector ground;
@@ -61,7 +61,8 @@ namespace GoatDescent
             Vector3 surfaceNormal = ground.IsGrounded ? ground.GroundNormal : Vector3.up;
             if (ground.IsGrounded) desired = Vector3.ProjectOnPlane(desired, surfaceNormal).normalized;
             bool braking = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            float downhillSpeed = ground.IsGrounded ? Mathf.InverseLerp(12f, 70f, ground.SlopeAngle) * 15f : 0f;
+            float downhillProgress = ground.IsGrounded ? Mathf.InverseLerp(66f, 89f, ground.SlopeAngle) : 0f;
+            float downhillSpeed = Mathf.SmoothStep(0f, 1f, downhillProgress) * 7f;
             if (braking) downhillSpeed *= .28f;
             var balance = GetComponent<GoatSlopeBalance>();
             if (balance && balance.HoovesHolding >= 3 && input.y <= 0f

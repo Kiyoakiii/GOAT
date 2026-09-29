@@ -5,8 +5,15 @@ namespace GoatDescent
     public sealed class RespawnController : MonoBehaviour
     {
         [SerializeField] private float killPlane = -12f;
-        private Rigidbody body; private Vector3 spawn;
-        public void Configure(Rigidbody targetBody, Vector3 targetSpawn) { body = targetBody; spawn = targetSpawn; }
+        private Rigidbody body;
+        private Vector3 spawn;
+        private RouteProgressTracker routeProgress;
+        public void Configure(Rigidbody targetBody, Vector3 targetSpawn, RouteProgressTracker progress = null)
+        {
+            body = targetBody;
+            spawn = targetSpawn;
+            routeProgress = progress;
+        }
         private void Awake() { body ??= GetComponent<Rigidbody>(); }
         private void Update()
         {
@@ -16,7 +23,9 @@ namespace GoatDescent
         }
         public void Respawn()
         {
-            Teleport(spawn);
+            Vector3 destination = routeProgress ? routeProgress.CheckpointPosition : spawn;
+            Teleport(destination);
+            routeProgress?.ResetToCheckpoint();
             SlopeRun.Instance?.ResetRun();
         }
         public void Teleport(Vector3 position)

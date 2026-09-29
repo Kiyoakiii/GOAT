@@ -4,9 +4,9 @@ namespace GoatDescent
 {
     public static class GoatSurfaceZones
     {
-        public const float StandMaxAngle = 55f;
-        public const float HoofMaxAngle = 63f;
-        public const float GripMaxAngle = 80f;
+        public const float StandMaxAngle = 62f;
+        public const float HoofMaxAngle = 73f;
+        public const float GripMaxAngle = 86f;
 
         public static bool CanStand(float slopeAngle) => slopeAngle <= StandMaxAngle;
         public static bool CanGrip(float slopeAngle) => slopeAngle <= GripMaxAngle;
