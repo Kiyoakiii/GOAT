@@ -5,6 +5,7 @@ OUT = r'A:/GameDev/Projects/goat/Assets/GoatDescent/Art/RefinedGoat'
 ACTIONS = (
     'Goat_Idle', 'Goat_Walk', 'Goat_Jump',
     'Goat_EatGrass', 'Goat_Pee', 'Goat_Poop',
+    'Goat_Surprise',
     'Goat_Sequence', 'GoatA_Duo_Performance', 'GoatB_Duo_Performance',
 )
 os.makedirs(OUT, exist_ok=True)

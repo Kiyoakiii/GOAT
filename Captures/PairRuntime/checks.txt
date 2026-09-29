@@ -1,0 +1,29 @@
+PASS two_goats 
+PASS dynamic_bodies 
+PASS one_active_camera 
+PASS clip_Goat_Push 
+PASS clip_Goat_PushReact 
+PASS clip_Goat_GrabStart 
+PASS clip_Goat_GrabbedStart 
+PASS clip_Goat_GrabHold 
+PASS clip_Goat_GrabbedHold 
+PASS clip_Goat_Pull 
+PASS clip_Goat_Hang 
+PASS clip_Goat_Release 
+PASS only_selected_moves 
+PASS tap_shoves_once travel=0,7568353
+PASS hold_grabs_two_dynamic_bodies 
+PASS release_without_shove 
+PASS catch_lower_goat vertical_gap=0,8305969
+PASS rescue_reaches_upper_shelf rise=1,013672 rescuer_travel=4,367086 force=777,2378 ground=Upper practice shelf
+PASS switch_releases_joint 
+PASS partner_respawn_cleanup 
+PASS edge_shove_falls drop=0,8500366
+PASS out_of_reach_rejected 
+PASS wall_blocks_interaction 
+PASS ordinary_jump 
+PASS five_shoves_stable 
+PASS death_clears_grip 
+PASS inactive_respawn_stays_inactive 
+PASS disable_clears_grip 
+PASS existing_vault_and_grip_cleanup 

@@ -5,17 +5,20 @@ namespace GoatDescent
     [RequireComponent(typeof(Camera))]
     public sealed class ThirdPersonGoatCamera : MonoBehaviour
     {
-        [SerializeField] private float distance = 7.5f;
-        [SerializeField] private float minDistance = 3.25f;
+        [SerializeField] private float distance = 5.8f;
+        [SerializeField] private float minDistance = 2.4f;
         [SerializeField] private float maxDistance = 15f;
-        [SerializeField] private float zoomSpeed = 10f;
-        [SerializeField] private float height = 2.2f;
+        [SerializeField] private float zoomSpeed = 8f;
+        [SerializeField] private float height = 1.4f;
         [SerializeField] private float sensitivity = 150f;
         [SerializeField] private float minPitch = -25f;
         [SerializeField] private float maxPitch = 65f;
         [SerializeField] private float collisionRadius = .22f;
-        [SerializeField] private float lookAheadDistance = 5f;
-        [SerializeField] private float lookDownOffset = 1f;
+        [SerializeField] private float lookAheadDistance = 1f;
+        [SerializeField] private float lookDownOffset = .25f;
+        [SerializeField] private float followSharpness = 18f;
+        [SerializeField] private float rotationSharpness = 18f;
+        [SerializeField] private float teleportSnapDistance = 8f;
         [SerializeField] private Transform target;
         // The first safe ledge is below and slightly left of the summit; open the game looking at the decision.
         private float yaw = -27f, pitch = 20f;
@@ -28,10 +31,15 @@ namespace GoatDescent
             yaw = initialYaw;
             hasInitialPosition = false;
         }
+        public void Configure(Transform newTarget, float initialYaw, float initialPitch)
+        {
+            Configure(newTarget, initialYaw);
+            pitch = Mathf.Clamp(initialPitch, minPitch, maxPitch);
+        }
 
         private void Start()
         {
-            GetComponent<Camera>().fieldOfView = 68f;
+            GetComponent<Camera>().fieldOfView = 62f;
             Cursor.lockState = CursorLockMode.Locked;
         }
 
@@ -39,6 +47,10 @@ namespace GoatDescent
         {
             target ??= FindFirstObjectByType<GoatController>()?.transform;
             if (!target) return;
+            var vault = target.GetComponent<GoatHornVault>();
+            var camera = GetComponent<Camera>();
+            camera.fieldOfView = Mathf.Lerp(camera.fieldOfView, vault && vault.IsVaulting ? 77f : 62f,
+                1f - Mathf.Exp(-5f * Time.deltaTime));
 
             if (Cursor.lockState == CursorLockMode.Locked)
             {
@@ -64,16 +76,17 @@ namespace GoatDescent
             Vector3 lookAt = pivot + viewForward * lookAheadDistance - Vector3.up * lookDownOffset;
             Quaternion viewRotation = Quaternion.LookRotation(lookAt - desiredPosition, Vector3.up);
 
-            if (!hasInitialPosition)
+            if (!hasInitialPosition || (desiredPosition - transform.position).sqrMagnitude > teleportSnapDistance * teleportSnapDistance)
             {
-                // A runtime-created camera starts at world origin. Do not make the player wait for it to cross a 130 m mountain.
+                // Start at the player and snap after a summit reset instead of gliding across the mountain.
                 transform.SetPositionAndRotation(desiredPosition, viewRotation);
                 hasInitialPosition = true;
             }
             else
             {
-                transform.position = Vector3.Lerp(transform.position, desiredPosition, 1f - Mathf.Exp(-14f * Time.deltaTime));
-                transform.rotation = viewRotation;
+                float dt = Time.deltaTime;
+                transform.position = Vector3.Lerp(transform.position, desiredPosition, 1f - Mathf.Exp(-followSharpness * dt));
+                transform.rotation = Quaternion.Slerp(transform.rotation, viewRotation, 1f - Mathf.Exp(-rotationSharpness * dt));
             }
         }
     }

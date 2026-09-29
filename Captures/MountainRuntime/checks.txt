@@ -1,0 +1,22 @@
+PASS stable_id_capacity LEDGE-011
+PASS local_two_goats_default A=True B=True network=False
+PASS local_control_switch active=Mountain Goat B
+PASS marked_snow_site SNOW-06
+PASS snow_load_reduces_traction loose=True traction=0,16
+PASS late_snow_state loose=True seconds=5,32
+PASS personal_respawn_preserves_snow loose=True
+PASS snow_recovers_by_level_rule loose=False
+PASS rock_scenario_in_snapshot local=11 received=11
+PASS physical_rock_shove requested=True active=1
+PASS lower_goat_sees_rock_path visibleSamples=6 firstTime=0,9s firstDistance=4,1m moving=True viewport=(-0.06, -0.54, 8.77)
+PASS one_goat_load phase=Intact load=72,0 cracks=0
+PASS one_goat_twenty_seconds phase=Intact load=72,0
+PASS two_goats_crack phase=Cracking load=144,0 cracks=3
+PASS late_snapshot_phase_and_countdown phase=Cracking hostSeconds=1,90 clientSeconds=1,90 cracks=3
+PASS overload_breaks_once phase=Broken cracks=0 reason=разрушен нагрузкой 144 кг
+PASS personal_respawn_preserves_break phase=Broken
+PASS safe_global_restore phase=Intact
+PASS warning_recovers_when_load_leaves phase=Intact load=72,0 cracks=0
+PASS hanging_goat_adds_load grabbed=True load=144,0 parts=Mountain Goat A: 72 + удар 0 кг; Mountain Goat B: 72 кг через сцепление
+PASS one_finish_waits team still descending
+PASS team_finish both finished

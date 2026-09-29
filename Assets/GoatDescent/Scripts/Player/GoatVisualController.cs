@@ -25,11 +25,41 @@ namespace GoatDescent
         private Rigidbody body;
         private GoatGroundDetector ground;
         private Transform visual;
-        private float landSquash;
         private Animation importedAnimation;
         private string manualActionClip;
         private float manualActionUntil;
+        private string activeAutomaticClip = "Goat_Idle";
+        private bool surpriseEarMaskReady;
         private GUIStyle animationHelpStyle;
+        private Vector3 interactionFacing;
+        private string networkClip;
+        private Vector3 networkFacing;
+        private float faceUntil;
+        public Vector3 Facing => visual ? visual.forward : transform.forward;
+        public string CurrentClip => manualActionClip ?? activeAutomaticClip;
+        public void ApplyNetworkPose(string clip, Vector3 facing)
+        {
+            networkClip = clip;
+            networkFacing = facing;
+        }
+        public void SetFacing(Vector3 direction)
+        {
+            interactionFacing = direction; faceUntil = Time.time + .1f;
+            if (visual) visual.rotation = Quaternion.LookRotation(direction, Vector3.up);
+        }
+        public void FaceInteraction(Vector3 direction, float duration)
+        { interactionFacing = direction; faceUntil = Time.time + duration; }
+        public void PlayInteraction(string clip, float duration, Vector3 direction)
+        {
+            FaceInteraction(direction, duration);
+            if (!importedAnimation || importedAnimation[clip] == null) return;
+            importedAnimation.Stop("Goat_Surprise");
+            var state = importedAnimation[clip];
+            state.time = 0f; state.speed = 1f; state.wrapMode = WrapMode.Once;
+            manualActionClip = clip; manualActionUntil = Time.time + duration;
+            activeAutomaticClip = clip;
+            importedAnimation.CrossFade(clip, .09f, PlayMode.StopSameLayer);
+        }
 
         public void Configure(Rigidbody targetBody, GoatGroundDetector targetGround)
         {
@@ -48,7 +78,38 @@ namespace GoatDescent
             visual = transform.Find(VisualName);
             if (!visual)
                 BuildVisual();
+
+            if (visual)
+                importedAnimation ??= visual.GetComponentInChildren<Animation>();
+            if (importedAnimation)
+                visual.localPosition = new Vector3(0f, -0.08f, 0f);
+            if (visual && GetComponent<GoatLocalControl>()?.Label == "B")
+            {
+                var tint = new MaterialPropertyBlock();
+                tint.SetColor("_Color", new Color(.72f, .46f, .26f, 1f));
+                foreach (var renderer in visual.GetComponentsInChildren<Renderer>())
+                {
+                    var materials = renderer.sharedMaterials;
+                    for (int i = 0; i < materials.Length; i++)
+                        if (materials[i] && materials[i].name == "hideWhite") renderer.SetPropertyBlock(tint, i);
+                }
+            }
+
+            if (importedAnimation != null)
+            {
+                foreach (AnimationState state in importedAnimation)
+                    state.wrapMode = IsLoop(state.name) ? WrapMode.Loop : state.name == "Goat_Jump" ? WrapMode.ClampForever : WrapMode.Once;
+                ConfigureSurpriseEarMask();
+                if (!importedAnimation.isPlaying)
+                    importedAnimation.Play("Goat_Idle");
+            }
+            if (interactionFacing.sqrMagnitude > .01f) SetFacing(interactionFacing);
         }
+        private static bool IsLoop(string clip) => clip == "Goat_Idle" || clip == "Goat_Walk"
+            || clip == "Goat_GrabHold" || clip == "Goat_GrabbedHold" || clip == "Goat_Pull"
+            || clip == "Goat_Hang"
+            || clip == "Goat_RescueBrace" || clip == "Goat_GripStrain"
+            || clip == "Goat_FreeFall" || clip == "Goat_EagleCarry";
 
         private void BuildVisual()
         {
@@ -58,12 +119,6 @@ namespace GoatDescent
                 visual = Instantiate(refined, transform, false).transform;
                 visual.name = VisualName;
                 importedAnimation = visual.GetComponentInChildren<Animation>();
-                if (importedAnimation != null)
-                {
-                    foreach (AnimationState state in importedAnimation)
-                        state.wrapMode = state.name == "Goat_Idle" || state.name == "Goat_Walk" ? WrapMode.Loop : state.name == "Goat_Jump" ? WrapMode.ClampForever : WrapMode.Once;
-                    importedAnimation.Play("Goat_Idle");
-                }
                 return;
             }
             EnsureMaterials();
@@ -227,35 +282,88 @@ namespace GoatDescent
             if (!visual || !body)
                 return;
 
+            if (importedAnimation != null && !surpriseEarMaskReady)
+                ConfigureSurpriseEarMask();
+
+            if (!MountainAuthority.IsHost)
+            {
+                if (importedAnimation && !string.IsNullOrEmpty(networkClip)
+                    && importedAnimation[networkClip] != null && activeAutomaticClip != networkClip)
+                {
+                    importedAnimation[networkClip].wrapMode = IsLoop(networkClip) ? WrapMode.Loop : WrapMode.Once;
+                    importedAnimation.CrossFade(networkClip, .12f, PlayMode.StopSameLayer);
+                    activeAutomaticClip = networkClip;
+                }
+                if (networkFacing.sqrMagnitude > .01f)
+                    visual.rotation = Quaternion.Slerp(visual.rotation,
+                        Quaternion.LookRotation(networkFacing, Vector3.up), 1f - Mathf.Exp(-15f * Time.deltaTime));
+                return;
+            }
+
             if (importedAnimation != null)
             {
-                ReadAnimationHotkeys();
+                if (GoatLocalControl.AllowsInput(this) && !(GetComponent<GoatInteraction>()?.IsBusy ?? false)) ReadAnimationHotkeys();
                 if (!string.IsNullOrEmpty(manualActionClip) && Time.time >= manualActionUntil)
+                    manualActionClip = null;
+
+                var goat = GetComponent<GoatController>();
+                if (goat && (goat.IsPredatorCarried || (ground && !ground.IsGrounded && body.linearVelocity.y < -3f)))
                     manualActionClip = null;
 
                 if (string.IsNullOrEmpty(manualActionClip))
                 {
                     Vector3 velocity = body.linearVelocity;
                     velocity.y = 0f;
-                    string clip = ground && !ground.IsGrounded ? "Goat_Jump" : velocity.sqrMagnitude > .2f ? "Goat_Walk" : "Goat_Idle";
+                    string clip = goat && goat.IsPredatorCarried ? "Goat_Idle"
+                        : ground && !ground.IsGrounded
+                            ? "Goat_Jump"
+                            : velocity.sqrMagnitude > .2f ? "Goat_Walk" : "Goat_Idle";
+                    var pair = GetComponent<GoatInteraction>();
+                    if (pair && pair.IsLinked && !(goat && goat.IsPredatorCarried))
+                    {
+                        if (pair.IsHolding)
+                        {
+                            clip = pair.IsPulling ? "Goat_Pull"
+                                : pair.Partner && !pair.Partner.GetComponent<GoatGroundDetector>().IsGrounded
+                                    ? "Goat_RescueBrace" : "Goat_GrabHold";
+                        }
+                        else
+                            clip = ground && ground.IsGrounded ? "Goat_GrabbedHold" : "Goat_GripStrain";
+                    }
+                    if (importedAnimation[clip] == null) clip = "Goat_Idle";
                     if (!importedAnimation.IsPlaying(clip))
+                    {
+                        importedAnimation[clip].wrapMode = IsLoop(clip) ? WrapMode.Loop : WrapMode.Once;
                         importedAnimation.CrossFade(clip, .15f);
+                        if (activeAutomaticClip != clip)
+                        {
+                            activeAutomaticClip = clip;
+                            if (!(pair && pair.IsLinked)) ApplySurpriseEarsForAction(clip);
+                        }
+                    }
                 }
+            }
+
+            if (GetComponent<GoatPhysicalBody>()?.RootIsTumbling == true)
+            {
+                visual.rotation = body.rotation;
+                return;
             }
 
             Vector3 horizontal = body.linearVelocity;
             horizontal.y = 0f;
-            if (horizontal.sqrMagnitude > 0.2f)
+            if (Time.time < faceUntil && interactionFacing.sqrMagnitude > .01f)
+            {
+                visual.rotation = Quaternion.Slerp(visual.rotation, Quaternion.LookRotation(interactionFacing, Vector3.up), 1f - Mathf.Exp(-16f * Time.deltaTime));
+            }
+            else if (horizontal.sqrMagnitude > 0.2f)
             {
                 Vector3 up = ground && ground.IsGrounded ? ground.GroundNormal : Vector3.up;
                 Quaternion target = Quaternion.LookRotation(horizontal.normalized, up);
                 visual.rotation = Quaternion.Slerp(visual.rotation, target, Time.deltaTime * 9f);
             }
 
-            if (ground && ground.IsGrounded && body.linearVelocity.y < -2f)
-                landSquash = 0.14f;
-            landSquash = Mathf.MoveTowards(landSquash, 0f, Time.deltaTime * 1.6f);
-            visual.localScale = new Vector3(1f + landSquash * 0.35f, 1f - landSquash, 1f + landSquash * 0.35f);
+            visual.localScale = Vector3.one;
         }
 
         private void ReadAnimationHotkeys()
@@ -266,7 +374,11 @@ namespace GoatDescent
             else if (Input.GetKeyDown(KeyCode.V)) PlayManualAction("Goat_Sequence");
             else if (Input.GetKeyDown(KeyCode.Z)) PlayManualAction("GoatA_Duo_Performance");
             else if (Input.GetKeyDown(KeyCode.X)) PlayManualAction("GoatB_Duo_Performance");
+            else if (Input.GetKeyDown(KeyCode.T)) TriggerSurprise();
         }
+
+        /// <summary>Plays the startled ear-flick reaction; gameplay events can call this directly.</summary>
+        public void TriggerSurprise() => PlayManualAction("Goat_Surprise");
 
         private void PlayManualAction(string clipName)
         {
@@ -277,17 +389,86 @@ namespace GoatDescent
                 return;
             }
 
+            if (clipName == "Goat_Surprise")
+            {
+                PlaySurpriseEarOverlay();
+                return;
+            }
+
             state.wrapMode = WrapMode.Once;
             state.time = 0f;
             state.speed = 1f;
             manualActionClip = clipName;
             manualActionUntil = Time.time + Mathf.Max(state.length, 0.25f);
+            activeAutomaticClip = clipName;
             importedAnimation.CrossFade(clipName, 0.2f, PlayMode.StopSameLayer);
+            ApplySurpriseEarsForAction(clipName);
+        }
+
+        private void ApplySurpriseEarsForAction(string clipName)
+        {
+            if (ShouldAutoTriggerSurpriseEars(clipName))
+                PlaySurpriseEarOverlay();
+            else if (importedAnimation)
+                importedAnimation.Stop("Goat_Surprise");
+        }
+
+        private void ConfigureSurpriseEarMask()
+        {
+            AnimationState state = importedAnimation?["Goat_Surprise"];
+            if (state == null || !visual) return;
+
+            Transform leftEar = FindBone(visual, "Ear.L");
+            Transform rightEar = FindBone(visual, "Ear.R");
+            if (!leftEar || !rightEar)
+            {
+                Debug.LogWarning("Goat surprise ear animation is missing Ear.L or Ear.R in the imported rig.");
+                return;
+            }
+
+            state.layer = 1;
+            state.blendMode = AnimationBlendMode.Blend;
+            state.AddMixingTransform(leftEar);
+            state.AddMixingTransform(rightEar);
+            surpriseEarMaskReady = true;
+        }
+
+        private void PlaySurpriseEarOverlay()
+        {
+            if (!importedAnimation) return;
+            if (!surpriseEarMaskReady) ConfigureSurpriseEarMask();
+
+            AnimationState state = importedAnimation["Goat_Surprise"];
+            if (state == null || !surpriseEarMaskReady) return;
+            state.wrapMode = WrapMode.Once;
+            state.time = 0f;
+            state.speed = 1f;
+            state.weight = 1f;
+            importedAnimation.CrossFade("Goat_Surprise", 0.15f, PlayMode.StopSameLayer);
+        }
+
+        private static bool ShouldAutoTriggerSurpriseEars(string clipName)
+        {
+            return clipName != "Goat_Idle"
+                && clipName != "Goat_Walk"
+                && clipName != "Goat_EatGrass"
+                && clipName != "Goat_Surprise";
+        }
+
+        private static Transform FindBone(Transform root, string boneName)
+        {
+            foreach (Transform child in root)
+            {
+                if (child.name == boneName) return child;
+                Transform nested = FindBone(child, boneName);
+                if (nested) return nested;
+            }
+            return null;
         }
 
         private void OnGUI()
         {
-            if (importedAnimation == null)
+            if (importedAnimation == null || !GoatLocalControl.AllowsInput(this))
                 return;
 
             animationHelpStyle ??= new GUIStyle(GUI.skin.label)
@@ -296,7 +477,7 @@ namespace GoatDescent
                 normal = { textColor = new Color(1f, 1f, 1f, 0.94f) }
             };
             GUI.Label(new Rect(25, 108, 960, 24),
-                "Анимации: Q — трава   E — пописать   C — покакать   V — весь ролик   Z/X — роли дуэта",
+                "Анимации: Q — трава   E — пописать   C — покакать   T — удивление   V — весь ролик   Z/X — роли дуэта",
                 animationHelpStyle);
         }
     }

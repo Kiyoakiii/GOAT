@@ -80,7 +80,9 @@ namespace GoatDescent.Editor
                 if (!AssetDatabase.IsValidFolder("Assets/GoatDescent/Resources")) AssetDatabase.CreateFolder("Assets/GoatDescent", "Resources");
                 PrefabUtility.SaveAsPrefabAsset(root, "Assets/GoatDescent/Resources/GoatDuoRefined.prefab");
                 AssetDatabase.SaveAssets();
-                Debug.Log("REFINED_GOAT_READY source=Goat_Duo_Refined.blend clips=Idle,Walk,Jump,EatGrass,Pee,Poop,Sequence,GoatA_Duo_Performance,GoatB_Duo_Performance");
+                if (AssetDatabase.LoadAssetAtPath<GameObject>("Assets/GoatDescent/Art/RefinedGoat/Goat_PairGameplay.fbx")) PairAnimationImporter.Build();
+                if (AssetDatabase.LoadAssetAtPath<GameObject>("Assets/GoatDescent/Art/RefinedGoat/Goat_PhysicsActions.fbx")) PairAnimationImporter.ImportPhysics();
+                Debug.Log("REFINED_GOAT_READY source=Goat_Duo_Refined.blend clips=Idle,Walk,Jump,EatGrass,Pee,Poop,Surprise,Sequence,GoatA_Duo_Performance,GoatB_Duo_Performance");
             }
             finally { Object.DestroyImmediate(root); }
         }

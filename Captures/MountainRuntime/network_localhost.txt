@@ -1,0 +1,22 @@
+Verification: two separate Windows processes on the same PC (127.0.0.1).
+Cross-PC visual verification remains to be performed.
+
+HOST:
+MOUNTAIN_NET_CONNECTED role=host peer=127.0.0.1:59008
+MOUNTAIN_VERIFY_SINGLE id=LEDGE-011 phase=Intact load=72 elapsed=20
+MOUNTAIN_LEDGE LEDGE-011 разрушен нагрузкой 144 кг
+MOUNTAIN_VERIFY_OVERLOAD id=LEDGE-011 load=144 reason=разрушен нагрузкой 144 кг
+
+GUEST:
+MOUNTAIN_NET_CONNECTED role=guest peer=127.0.0.1:7777
+MOUNTAIN_NET_LEDGE_STAGE id=LEDGE-011 phase=0 load=0 sequence=1
+MOUNTAIN_NET_LEDGE_STAGE id=LEDGE-011 phase=1 load=144 sequence=1146
+MOUNTAIN_NET_LEDGE_STAGE id=LEDGE-011 phase=2 load=144 sequence=1154
+MOUNTAIN_NET_LEDGE_STAGE id=LEDGE-011 phase=3 load=144 sequence=1190
+MOUNTAIN_NET_LEDGE_STAGE id=LEDGE-011 phase=4 load=0 sequence=1411
+
+RECONNECT (guest process restarted while host kept running):
+MOUNTAIN_NET_CONNECTED role=host peer=127.0.0.1:59709
+MOUNTAIN_NET_CONNECTED role=host peer=127.0.0.1:59722
+MOUNTAIN_NET_CONNECTED role=guest peer=127.0.0.1:7777
+MOUNTAIN_NET_SNAPSHOT_RX sequence=500 goats=2 ledges=52

@@ -85,7 +85,20 @@ namespace GoatDescent
             }
             if (ownsSettings)
                 Destroy(settings);
-            CreateGoat(spawn, initialYaw);
+            Transform startPillar = FindStartPillar(worldScene);
+            if (startPillar != null)
+            {
+                var stone = startPillar.Find("Stratified sandstone");
+                var surface = stone ? stone.GetComponent<MeshCollider>() : null;
+                if (surface && surface.Raycast(new Ray(spawn + startPillar.forward * 10f + Vector3.up * 20f, Vector3.down), out RaycastHit lip, 50f))
+                    spawn = lip.point + Vector3.up * .12f;
+                PillarDescentLevel.Build(startPillar, spawn, terrainSurface);
+            }
+            var primary = CreateGoat(spawn, initialYaw, "Mountain Goat A");
+            var secondary = CreateGoat(spawn + Vector3.right * 2.5f, initialYaw, "Mountain Goat B");
+            var follow = CreateCamera(primary.transform, initialYaw);
+            gameObject.AddComponent<LocalGoatPair>().Configure(primary, secondary, follow, spawn, initialYaw, startPillar);
+            gameObject.AddComponent<MountainNetSession>();
             Debug.Log($"PROCEDURAL_GOAT_WORLD_READY scene={WorldSceneName} spawn=({spawn.x:F1}, {spawn.y:F1}, {spawn.z:F1}) cameraYaw={initialYaw:F1}");
         }
 
@@ -130,6 +143,16 @@ namespace GoatDescent
             return nearestDistanceSquared < float.PositiveInfinity
                 ? Mathf.LerpAngle(vistaYaw, nearestTreeYaw, forestBlend)
                 : vistaYaw;
+        }
+
+        private static Transform FindStartPillar(Scene scene)
+        {
+            foreach (GameObject root in scene.GetRootGameObjects())
+            {
+                if (root.name != "Misty forest pillars vista") continue;
+                return root.transform.Find("Forest pillar 21");
+            }
+            return null;
         }
 
         private static void DisablePreviewCameras(Scene scene)
@@ -320,9 +343,9 @@ namespace GoatDescent
             return estimatedPeak + Vector3.up * 0.12f;
         }
 
-        private static void CreateGoat(Vector3 spawn, float initialYaw)
+        private static GoatController CreateGoat(Vector3 spawn, float initialYaw, string label)
         {
-            var goat = new GameObject("Mountain Goat");
+            var goat = new GameObject(label);
             goat.transform.position = spawn;
             goat.transform.rotation = Quaternion.Euler(0f, initialYaw, 0f);
             int playerLayer = LayerMask.NameToLayer("Player");
@@ -341,13 +364,23 @@ namespace GoatDescent
             capsule.center = new Vector3(0f, 0.58f, 0f);
 
             var detector = goat.AddComponent<GoatGroundDetector>();
+            goat.AddComponent<GoatLocalControl>();
             var controller = goat.AddComponent<GoatController>();
             controller.Configure(body, detector);
+            goat.AddComponent<GoatCliffGrip>();
+            goat.AddComponent<GoatHornVault>();
             goat.AddComponent<GoatJumpController>().Configure(controller, detector);
             goat.AddComponent<GoatLandingAssist>().Configure(body, detector);
             goat.AddComponent<GoatVisualController>().Configure(body, detector);
+            goat.AddComponent<GoatPhysicalBody>();
             goat.AddComponent<RespawnController>().Configure(body, spawn);
+            goat.AddComponent<GoatInteraction>();
+            goat.AddComponent<GoatGripBalance>();
+            return controller;
+        }
 
+        private static ThirdPersonGoatCamera CreateCamera(Transform goat, float initialYaw)
+        {
             var cameraRoot = new GameObject("Third Person Goat Camera");
             cameraRoot.tag = "MainCamera";
             var camera = cameraRoot.AddComponent<Camera>();
@@ -356,7 +389,9 @@ namespace GoatDescent
             camera.farClipPlane = 5000f;
             camera.allowHDR = true;
             camera.allowMSAA = true;
-            cameraRoot.AddComponent<ThirdPersonGoatCamera>().Configure(goat.transform, initialYaw);
+            var follow = cameraRoot.AddComponent<ThirdPersonGoatCamera>();
+            follow.Configure(goat, initialYaw);
+            return follow;
         }
     }
 }
