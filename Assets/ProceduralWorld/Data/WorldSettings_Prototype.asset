@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6d56551379907724694c6eac01edc693, type: 3}
+  m_Name: WorldSettings_Prototype
+  m_EditorClassIdentifier: Assembly-CSharp::GoatDescent.ProceduralWorld.WorldSettings
+  seed: 847291
+  worldSize: 2048
+  heightScale: 360
+  seaLevel: 0.22
+  terrainResolution: 513
+  chunkSize: 512
+  mountainStrength: 0.8
+  mountainFrequency: 0.0017
+  biomeScale: 0.00105
+  erosionStrength: 0.22
+  snowLine: 0.8
+  snowTemperatureThreshold: 0.36
+  snowCoverage: 0.86
+  grassDensity: 0.9
+  grassSlopeLimit: 30
+  vegetationDensity: 0.72
+  rockDensity: 0.68
+  cliffDensity: 0.58
+  treeSlopeLimit: 34
+  cliffSlopeThreshold: 43
