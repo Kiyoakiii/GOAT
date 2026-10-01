@@ -62,7 +62,8 @@ namespace GoatDescent
             var body = plate.AddComponent<Rigidbody>();
             body.mass = 28f;
             body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-            plate.AddComponent<CrumblingPlatform>();
+            plate.AddComponent<CrumblingPlatform>().Configure(
+                (platform.IsBranch ? "BRANCH-" : "MAIN-") + platform.Index);
         }
 
         private static GameObject CreateLandingSlab(Transform parent, string name, LandingPlatform platform,

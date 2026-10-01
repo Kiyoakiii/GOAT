@@ -12,13 +12,28 @@ namespace GoatDescent
         public Vector3 GroundNormal { get; private set; } = Vector3.up;
         public float SlopeAngle { get; private set; }
         public RaycastHit GroundHit { get; private set; }
+        private readonly RaycastHit[] probeHits = new RaycastHit[24];
 
         private void FixedUpdate()
         {
             Vector3 origin = transform.position + Vector3.up * .55f;
-            IsGrounded = Physics.SphereCast(origin, probeRadius, Vector3.down, out var hit, probeDistance + .12f, groundMask, QueryTriggerInteraction.Ignore);
-            if (IsGrounded) { GroundHit = hit; GroundNormal = hit.normal; SlopeAngle = Vector3.Angle(hit.normal, Vector3.up); }
-            else { GroundNormal = Vector3.up; SlopeAngle = 90f; }
+            int count = Physics.SphereCastNonAlloc(origin, probeRadius, Vector3.down, probeHits,
+                probeDistance + .12f, groundMask, QueryTriggerInteraction.Ignore);
+            float nearest = float.PositiveInfinity;
+            IsGrounded = false;
+            for (int i = 0; i < count; i++)
+            {
+                RaycastHit hit = probeHits[i];
+                if (!hit.collider || hit.collider.attachedRigidbody == GetComponent<Rigidbody>()) continue;
+                var part = hit.collider.GetComponentInParent<GoatPhysicsPart>();
+                if (part && part.Owner && part.Owner.gameObject == gameObject) continue;
+                if (hit.distance >= nearest) continue;
+                nearest = hit.distance;
+                GroundHit = hit;
+                IsGrounded = true;
+            }
+            if (IsGrounded) { GroundNormal = GroundHit.normal; SlopeAngle = Vector3.Angle(GroundNormal, Vector3.up); }
+            else { GroundHit = default; GroundNormal = Vector3.up; SlopeAngle = 90f; }
         }
 
         private void OnDrawGizmosSelected()

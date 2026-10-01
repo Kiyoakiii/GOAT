@@ -73,11 +73,17 @@ namespace GoatDescent
         }
         private void FixedUpdate()
         {
+            var controller = GetComponent<GoatController>();
+            if (!MountainAuthority.IsHost || (controller && controller.IsPredatorCarried)
+                || !(controller && controller.NetworkOwnedByRemote)
+                    && !GoatLocalControl.AllowsInput(this))
+            { IsGripping = false; SuperActive = false; return; }
             if (!body || body.isKinematic)
             { IsGripping = false; SuperActive = false; return; }
             if (ground && ground.IsGrounded && ground.SlopeAngle < 30f && !SuperActive)
                 superCharge = Mathf.Min(1.15f, superCharge + Time.fixedDeltaTime * .48f);
-            bool superHeld = Input.GetKey(KeyCode.F) && Time.time >= superReleasedUntil && superCharge > .03f;
+            bool superHeld = controller && controller.WantsSuperHooves && Time.time >= superReleasedUntil
+                && superCharge > .03f;
             if (superHeld && GoatCliffProbe.Find(transform, out var superHit))
             {
                 if (!SuperActive)
@@ -93,9 +99,8 @@ namespace GoatDescent
                 superCharge = Mathf.Max(0f, superCharge - Time.fixedDeltaTime);
                 Vector3 superDownhill = Vector3.ProjectOnPlane(Vector3.down, superHit.normal).normalized;
                 Vector3 superAcross = Vector3.Cross(superHit.normal, Vector3.up).normalized;
-                var view = Camera.main;
-                if (view && Vector3.Dot(superAcross, view.transform.right) < 0f) superAcross = -superAcross;
-                float superSteer = (Input.GetKey(KeyCode.D) ? 1f : 0f) - (Input.GetKey(KeyCode.A) ? 1f : 0f);
+                if (Vector3.Dot(superAcross, controller.InputCameraRight) < 0f) superAcross = -superAcross;
+                float superSteer = controller.HorizontalInput;
                 Vector3 superVelocity = superDownhill * .18f + superAcross * superSteer * 1.3f - superHit.normal * .2f;
                 body.linearVelocity = Vector3.MoveTowards(body.linearVelocity, superVelocity, 75f * Time.fixedDeltaTime);
                 body.AddForce(-Physics.gravity, ForceMode.Acceleration);

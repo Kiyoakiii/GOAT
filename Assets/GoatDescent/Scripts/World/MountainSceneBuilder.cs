@@ -41,7 +41,43 @@ namespace GoatDescent
             }
 
             Vector3 spawn = MountainGenerator.SpawnPoint(settings);
-            GoatPlayerFactory.Create(spawn, 0f, settings.CheckpointRespawn);
+            var route = MountainGenerator.CurrentRoute;
+            Vector3 forward = route != null && route.Count > 1
+                ? Vector3.ProjectOnPlane(route[1].Center - route[0].Center, Vector3.up).normalized
+                : Vector3.forward;
+            if (forward.sqrMagnitude < .01f) forward = Vector3.forward;
+            float yaw = Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg;
+            Vector3 side = Vector3.Cross(Vector3.up, forward).normalized;
+            var first = GoatPlayerFactory.Create(spawn - side * .85f, yaw,
+                settings.CheckpointRespawn);
+            var second = GoatPlayerFactory.Create(spawn + side * .85f, yaw,
+                settings.CheckpointRespawn, false);
+            first.name = "Mountain Goat A";
+            second.name = "Mountain Goat B";
+            var follow = Camera.main.GetComponent<ThirdPersonGoatCamera>();
+            gameObject.AddComponent<LocalGoatPair>().Configure(first, second, follow,
+                spawn, yaw, null);
+            if (route != null && route.Count > 0)
+            {
+                var hazardObject = new GameObject("Goat interaction hazards");
+                hazardObject.transform.SetParent(root.transform, false);
+                hazardObject.AddComponent<MountainHazardDirector>().Initialize(route,
+                    MountainMaterial.Get(), root.transform.Find("Route Markers and Hazards"));
+                Vector3 birdCenter = route[Mathf.Min(3, route.Count - 1)].Center;
+                Vector3 birdOutward = Vector3.ProjectOnPlane(birdCenter, Vector3.up).normalized;
+                var flock = new GameObject("Five mountain eagles");
+                flock.transform.SetParent(root.transform, false);
+                flock.AddComponent<SkyPredatorEpisode>().Initialize(birdCenter,
+                    birdOutward, settings.SummitY);
+            }
+            gameObject.AddComponent<MountainSessionState>().Initialize();
+            gameObject.AddComponent<MountainNetSession>();
+            foreach (string argument in System.Environment.GetCommandLineArgs())
+                if (argument == "--goat-verify")
+                {
+                    gameObject.AddComponent<MountainIntegrationProbe>();
+                    break;
+                }
         }
 
         private static void SetupEnvironment(MountainSettings settings)

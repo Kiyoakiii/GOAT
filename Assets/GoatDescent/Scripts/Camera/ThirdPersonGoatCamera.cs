@@ -6,6 +6,9 @@ namespace GoatDescent
     public sealed class ThirdPersonGoatCamera : MonoBehaviour
     {
         [SerializeField] private float distance = 6.5f;
+        [SerializeField] private float minDistance = 2.4f;
+        [SerializeField] private float maxDistance = 15f;
+        [SerializeField] private float zoomSpeed = 8f;
         [SerializeField] private float height = 1.65f;
         [SerializeField] private float sensitivity = 150f;
         [SerializeField] private float minPitch = -25f;
@@ -28,7 +31,14 @@ namespace GoatDescent
             shake = Mathf.Max(shake, amount);
             fieldOfViewKick = Mathf.Max(fieldOfViewKick, extraFieldOfView);
         }
-        public void Configure(Transform newTarget) { target = newTarget; }
+        public void Configure(Transform newTarget)
+        {
+            target = newTarget;
+            goat = newTarget ? newTarget.GetComponent<GoatController>() : null;
+            ground = newTarget ? newTarget.GetComponent<GoatGroundDetector>() : null;
+            wall = newTarget ? newTarget.GetComponent<GoatWallJumpController>() : null;
+            Snap();
+        }
         public void SetPitch(float degrees) { pitch = Mathf.Clamp(degrees, minPitch, maxPitch); Snap(); }
         public void SetTestCliffView()
         {
@@ -41,9 +51,13 @@ namespace GoatDescent
         }
         public void Configure(Transform newTarget, float initialYaw)
         {
-            target = newTarget;
+            Configure(newTarget);
             yaw = initialYaw;
-            hasInitialPosition = false;
+        }
+        public void Configure(Transform newTarget, float initialYaw, float initialPitch)
+        {
+            Configure(newTarget, initialYaw);
+            pitch = Mathf.Clamp(initialPitch, minPitch, maxPitch);
         }
         private void Start() { GetComponent<Camera>().fieldOfView = 66f; Cursor.lockState = CursorLockMode.Locked; }
         private void LateUpdate()
@@ -53,6 +67,9 @@ namespace GoatDescent
             if (!goat) goat = target.GetComponent<GoatController>();
             if (!ground) ground = target.GetComponent<GoatGroundDetector>();
             if (!wall) wall = target.GetComponent<GoatWallJumpController>();
+            float scroll = Input.GetAxis("Mouse ScrollWheel");
+            if (Mathf.Abs(scroll) > .0001f)
+                distance = Mathf.Clamp(distance - scroll * zoomSpeed, minDistance, maxDistance);
             float speed = goat ? goat.Velocity.magnitude : 0f;
             if (Cursor.lockState == CursorLockMode.Locked && !(wall && wall.IsAiming)) { yaw += Input.GetAxis("Mouse X") * sensitivity * Time.unscaledDeltaTime; pitch = Mathf.Clamp(pitch - Input.GetAxis("Mouse Y") * sensitivity * Time.unscaledDeltaTime, minPitch, maxPitch); }
             float wantedPitch = ground && ground.IsGrounded ? Mathf.Lerp(0f, Mathf.Min(80f, ground.SlopeAngle + 10f), Mathf.InverseLerp(30f, 62f, ground.SlopeAngle)) : slopePitch;

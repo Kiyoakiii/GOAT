@@ -12,6 +12,7 @@ namespace GoatDescent
         private void CacheComponents() { body ??= GetComponent<Rigidbody>(); ground ??= GetComponent<GoatGroundDetector>(); }
         private void OnCollisionEnter(Collision collision)
         {
+            if (!MountainAuthority.IsHost) return;
             CacheComponents();
             if (!body || body.isKinematic || Time.time - lastLanding < landingCooldown || collision.contactCount == 0) return;
             var normal = collision.GetContact(0).normal;

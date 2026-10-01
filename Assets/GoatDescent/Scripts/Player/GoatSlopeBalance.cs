@@ -49,6 +49,7 @@ namespace GoatDescent
 
         private void FixedUpdate()
         {
+            if (!MountainAuthority.IsHost) return;
             if (GetComponent<GoatGripController>()?.SuperActive == true)
             {
                 Balance01 = Mathf.MoveTowards(Balance01, .8f, Time.fixedDeltaTime * 3f);
@@ -106,8 +107,10 @@ namespace GoatDescent
                 return;
             }
             supportCenter /= HoovesHolding;
-            float steering = (Input.GetKey(KeyCode.D) ? 1f : 0f) -
-                (Input.GetKey(KeyCode.A) ? 1f : 0f);
+            var controller = GetComponent<GoatController>();
+            bool hasInput = controller && (controller.NetworkOwnedByRemote
+                || GoatLocalControl.AllowsInput(this));
+            float steering = hasInput ? controller.HorizontalInput : 0f;
             // Momentum and the rider's steer move the projected weight across the hoof span.
             float offset = Vector3.Dot(body.position - supportCenter, right)
                 + Vector3.Dot(body.linearVelocity, right) * .022f - steering * .10f;
@@ -117,7 +120,7 @@ namespace GoatDescent
             float slopeCost = Mathf.InverseLerp(GoatSurfaceZones.StandMaxAngle, GoatSurfaceZones.GripMaxAngle, ground.SlopeAngle) * .18f;
             float speedCost = Mathf.InverseLerp(5f, 14f, body.linearVelocity.magnitude) * .1f;
             float missingCost = (4 - HoovesHolding) * .22f;
-            bool braking = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+            bool braking = hasInput && controller.WantsBrake;
             float recklessTurn = Mathf.Abs(steering) * Mathf.InverseLerp(4f, 11f, body.linearVelocity.magnitude)
                 * (braking ? .2f : 1f) * .23f;
             float target = Mathf.Clamp01(1f - outside * .7f - slopeCost - speedCost
