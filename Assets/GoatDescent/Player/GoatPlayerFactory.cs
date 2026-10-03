@@ -5,7 +5,8 @@ namespace GoatDescent
     /// <summary>Creates the same playable goat for the small practice scene.</summary>
     public static class GoatPlayerFactory
     {
-        public static void Create(Vector3 spawn, float initialYaw = 0f, bool checkpointRespawn = true, float cameraFarPlane = 900f)
+        public static GoatController Create(Vector3 spawn, float initialYaw = 0f,
+            bool checkpointRespawn = true, bool configureCamera = true)
         {
             var goat = new GameObject("Mountain Goat");
             goat.transform.position = spawn;
@@ -26,33 +27,36 @@ namespace GoatDescent
             var detector = goat.AddComponent<GoatGroundDetector>();
             var controller = goat.AddComponent<GoatController>();
             controller.Configure(body, detector);
+            goat.AddComponent<GoatLocalControl>();
             goat.AddComponent<GoatJumpController>().Configure(controller, detector);
+            goat.AddComponent<GoatCliffGrip>();
             goat.AddComponent<GoatGripController>();
             goat.AddComponent<GoatSlopeBalance>();
             goat.AddComponent<GoatLandingAssist>().Configure(body, detector);
             goat.AddComponent<GoatVisualController>().Configure(body, detector);
+            goat.AddComponent<GoatPhysicalBody>();
+            goat.AddComponent<GoatInteraction>();
             goat.AddComponent<GoatSpectacle>();
             var routeProgress = goat.AddComponent<RouteProgressTracker>();
             routeProgress.Configure(MountainGenerator.CurrentRoute, MountainMaterial.Get(), spawn, checkpointRespawn);
             goat.AddComponent<RespawnController>().Configure(body, spawn, routeProgress);
 
             var camera = Camera.main;
-            if (!camera) camera = Object.FindFirstObjectByType<Camera>();
             if (!camera)
             {
                 var cameraObject = new GameObject("Goat Camera");
                 cameraObject.tag = "MainCamera";
                 camera = cameraObject.AddComponent<Camera>();
             }
-            if (camera.transform.parent) camera.transform.SetParent(null);
             camera.clearFlags = CameraClearFlags.Skybox;
             camera.backgroundColor = new Color(.52f, .73f, .90f);
-            camera.farClipPlane = cameraFarPlane;
+            camera.farClipPlane = 900f;
             if (!camera.GetComponent<CinematicPostProcess>())
                 camera.gameObject.AddComponent<CinematicPostProcess>();
             var follow = camera.GetComponent<ThirdPersonGoatCamera>();
             if (!follow) follow = camera.gameObject.AddComponent<ThirdPersonGoatCamera>();
-            follow.Configure(goat.transform, initialYaw);
+            if (configureCamera) follow.Configure(goat.transform, initialYaw);
+            return controller;
         }
     }
 }

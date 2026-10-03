@@ -1,5 +1,9 @@
 fileFormatVersion: 2
+<<<<<<<< HEAD:Assets/GoatDescent/Bootstrap.meta
 guid: 1180668835031254096f6d8ad7b82db5
+========
+guid: 790f5664bbd5b434ea09dc5b7eb008f6
+>>>>>>>> origin/main:Assets/GoatDescent/Art/RefinedGoat.meta
 folderAsset: yes
 DefaultImporter:
   externalObjects: {}

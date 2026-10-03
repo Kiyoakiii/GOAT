@@ -69,6 +69,14 @@ namespace GoatDescent
             ApplyProgress();
         }
 
+        public void ResetToSummit()
+        {
+            if (route != null && route.Count > 0)
+                checkpoint = route[0].Center + Vector3.up * 1.45f;
+            checkpointProgress = currentProgress = 0f;
+            ApplyProgress();
+        }
+
         private void ApplyProgress()
         {
             if (routeMaterial) routeMaterial.SetFloat("_RouteProgress", currentProgress);

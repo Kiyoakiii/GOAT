@@ -1,6 +1,11 @@
 fileFormatVersion: 2
+<<<<<<<< HEAD:Assets/GoatDescent/Editor/GoatDescent.Editor.asmdef.meta
 guid: 6f6002e75f90eeb4d88c2fda4106cf49
 AssemblyDefinitionImporter:
+========
+guid: 92a18ce16d1b533499e9012c2ecd10af
+PrefabImporter:
+>>>>>>>> origin/main:Assets/GoatDescent/Resources/GoatDuoRefined.prefab.meta
   externalObjects: {}
   userData: 
   assetBundleName: 

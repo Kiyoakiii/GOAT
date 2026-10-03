@@ -1,41 +1,83 @@
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace GoatDescent
 {
-    /// <summary>Small cartoon pose animation driven by the goat's real movement.</summary>
+    /// <summary>
+    /// Lightweight, replaceable hero-goat model. The stylized meshes are combined
+    /// by material so this runtime prototype stays to a small number of draw calls.
+    /// </summary>
     public sealed class GoatVisualController : MonoBehaviour
     {
-        private const string RootName = "VisualRoot — replaceable goat model";
-        private readonly Transform[] legPivots = new Transform[4];
-        private readonly Transform[] ears = new Transform[2];
+        private const string VisualName = "VisualRoot — replaceable goat model";
+
+        private static Material coatMaterial;
+        private static Material muzzleMaterial;
+        private static Material hornMaterial;
+        private static Material hoofMaterial;
+        private static Material mouthMaterial;
+        private static Material pinkMaterial;
+        private static Material eyeWhiteMaterial;
+        private static Material eyeDarkMaterial;
+        private static Material sparkleMaterial;
 
         private Rigidbody body;
         private GoatGroundDetector ground;
         private Transform visual;
-        private Transform torso;
-        private Transform headPivot;
-        private Transform tailPivot;
-        private Transform tongue;
         private Animation importedAnimation;
-        private float walkCycle;
-        private float gaitWeight;
-        private float squash;
-        private float tumble;
-        private GameObject looseHorn;
-        private GameObject looseScarf;
-        private bool hornFlying;
-        private Vector3 previousVelocity;
-        private bool hasPreviousVelocity;
-        private float torsoPitch, torsoPitchSpeed;
-        private float torsoRoll, torsoRollSpeed;
-        private float headPitch, headPitchSpeed;
-        private float headRoll, headRollSpeed;
-        private float earFlop, earFlopSpeed;
-        private float tailSwing, tailSwingSpeed;
-        private float impactJolt;
-        private bool preparingJump;
-
-        public void SetJumpPreparation(bool value) => preparingJump = value;
+        private string manualActionClip;
+        private float manualActionUntil;
+        private string activeAutomaticClip = "Goat_Idle";
+        private bool surpriseEarMaskReady;
+        private GUIStyle animationHelpStyle;
+        private Vector3 interactionFacing;
+        private string networkClip;
+        private Vector3 networkFacing;
+        private float faceUntil;
+        public Vector3 Facing => visual ? visual.forward : transform.forward;
+        public string CurrentClip => manualActionClip ?? activeAutomaticClip;
+        public void SetJumpPreparation(bool value)
+        {
+            var motor = GetComponent<GoatController>();
+            if (motor) motor.IsBracingForJump = value;
+        }
+        public void PlayTakeoff(float amount = .14f)
+        {
+            if (!importedAnimation || importedAnimation["Goat_Jump"] == null) return;
+            var jump = importedAnimation["Goat_Jump"];
+            jump.time = 0f;
+            jump.wrapMode = WrapMode.ClampForever;
+            importedAnimation.CrossFade("Goat_Jump", .08f, PlayMode.StopSameLayer);
+            activeAutomaticClip = "Goat_Jump";
+        }
+        public void PlayLanding(float impact)
+        {
+            if (impact >= 7f) PlaySurpriseEarOverlay();
+        }
+        public void ApplyNetworkPose(string clip, Vector3 facing)
+        {
+            networkClip = clip;
+            networkFacing = facing;
+        }
+        public void SetFacing(Vector3 direction)
+        {
+            interactionFacing = direction; faceUntil = Time.time + .1f;
+            if (visual) visual.rotation = Quaternion.LookRotation(direction, Vector3.up);
+        }
+        public void FaceInteraction(Vector3 direction, float duration)
+        { interactionFacing = direction; faceUntil = Time.time + duration; }
+        public void PlayInteraction(string clip, float duration, Vector3 direction)
+        {
+            FaceInteraction(direction, duration);
+            if (!importedAnimation || importedAnimation[clip] == null) return;
+            importedAnimation.Stop("Goat_Surprise");
+            var state = importedAnimation[clip];
+            state.time = 0f; state.speed = 1f; state.wrapMode = WrapMode.Once;
+            manualActionClip = clip; manualActionUntil = Time.time + duration;
+            activeAutomaticClip = clip;
+            importedAnimation.CrossFade(clip, .09f, PlayMode.StopSameLayer);
+        }
 
         public void Configure(Rigidbody targetBody, GoatGroundDetector targetGround)
         {
@@ -51,278 +93,425 @@ namespace GoatDescent
 
         private void Start()
         {
-            visual = transform.Find(RootName);
-            if (!visual) BuildVisual();
-            CacheRig();
-            AttachRefinedGoat();
+            visual = transform.Find(VisualName);
+            if (!visual)
+                BuildVisual();
+
+            if (visual)
+                importedAnimation ??= visual.GetComponentInChildren<Animation>();
+            if (importedAnimation)
+                visual.localPosition = new Vector3(0f, -0.08f, 0f);
+            if (visual && GetComponent<GoatLocalControl>()?.Label == "B")
+            {
+                var tint = new MaterialPropertyBlock();
+                tint.SetColor("_Color", new Color(.72f, .46f, .26f, 1f));
+                foreach (var renderer in visual.GetComponentsInChildren<Renderer>())
+                {
+                    var materials = renderer.sharedMaterials;
+                    for (int i = 0; i < materials.Length; i++)
+                        if (materials[i] && materials[i].name == "hideWhite") renderer.SetPropertyBlock(tint, i);
+                }
+            }
+
+            if (importedAnimation != null)
+            {
+                foreach (AnimationState state in importedAnimation)
+                    state.wrapMode = IsLoop(state.name) ? WrapMode.Loop : state.name == "Goat_Jump" ? WrapMode.ClampForever : WrapMode.Once;
+                ConfigureSurpriseEarMask();
+                if (!importedAnimation.isPlaying)
+                    importedAnimation.Play("Goat_Idle");
+            }
+            if (interactionFacing.sqrMagnitude > .01f) SetFacing(interactionFacing);
         }
+        private static bool IsLoop(string clip) => clip == "Goat_Idle" || clip == "Goat_Walk"
+            || clip == "Goat_GrabHold" || clip == "Goat_GrabbedHold" || clip == "Goat_Pull"
+            || clip == "Goat_Hang"
+            || clip == "Goat_RescueBrace" || clip == "Goat_GripStrain"
+            || clip == "Goat_FreeFall" || clip == "Goat_EagleCarry";
 
         private void BuildVisual()
         {
-            visual = new GameObject(RootName).transform;
+            var refined = Resources.Load<GameObject>("GoatDuoRefined");
+            if (refined != null)
+            {
+                visual = Instantiate(refined, transform, false).transform;
+                visual.name = VisualName;
+                importedAnimation = visual.GetComponentInChildren<Animation>();
+                return;
+            }
+            EnsureMaterials();
+            visual = new GameObject(VisualName).transform;
             visual.SetParent(transform, false);
+            visual.localPosition = new Vector3(0f, 0.31f, 0f);
 
-            torso = NewPivot("Torso Motion", visual, Vector3.zero);
-            headPivot = NewPivot("Head Motion", torso, new Vector3(0f, 1.18f, .62f));
-            tailPivot = NewPivot("Tail Motion", torso, new Vector3(0f, .87f, -.61f));
+            // A round, fleece-covered body and raised chest give the goat a clear
+            // friendly silhouette even when viewed from the follow camera.
+            Part(PrimitiveType.Sphere, "Soft wool body", new Vector3(0f, 0.25f, -0.08f), new Vector3(0.91f, 0.60f, 1.18f), coatMaterial);
+            Part(PrimitiveType.Sphere, "Chest ruff", new Vector3(0f, 0.45f, 0.48f), new Vector3(0.75f, 0.72f, 0.67f), coatMaterial);
 
-            var coat = MakeMaterial(new Color(.77f, .68f, .51f));
-            var cream = MakeMaterial(new Color(.91f, .84f, .68f));
-            var muzzle = MakeMaterial(new Color(.96f, .89f, .76f));
-            var hoof = MakeMaterial(new Color(.24f, .21f, .19f));
-            var horn = MakeMaterial(new Color(.73f, .64f, .48f));
-            var eyeWhite = MakeMaterial(new Color(.98f, .96f, .87f));
-            var scarf = MakeMaterial(new Color(.22f, .43f, .47f));
-            var tonguePink = MakeMaterial(new Color(.97f, .40f, .57f));
-
-            Part(PrimitiveType.Sphere, "Rounded body", new Vector3(0f, .75f, -.08f), new Vector3(.84f, .62f, 1.15f), coat, torso);
-            Part(PrimitiveType.Sphere, "Chest", new Vector3(0f, .83f, .35f), new Vector3(.71f, .67f, .67f), cream, torso);
-            var neck = Part(PrimitiveType.Capsule, "Neck", new Vector3(0f, 1.12f, .51f), new Vector3(.34f, .45f, .34f), cream, torso);
-            neck.transform.localRotation = Quaternion.Euler(23f, 0f, 0f);
-            looseScarf = Part(PrimitiveType.Sphere, "Neckerchief", new Vector3(0f, 1.04f, .53f), new Vector3(.44f, .10f, .43f), scarf, torso);
-
-            HeadPart(PrimitiveType.Sphere, "Head", new Vector3(0f, 1.35f, .73f), new Vector3(.48f, .43f, .53f), cream);
-            HeadPart(PrimitiveType.Sphere, "Soft muzzle", new Vector3(0f, 1.23f, 1.05f), new Vector3(.36f, .25f, .40f), muzzle);
-            HeadPart(PrimitiveType.Sphere, "Nose", new Vector3(0f, 1.28f, 1.25f), new Vector3(.16f, .08f, .09f), hoof);
-            HeadPart(PrimitiveType.Sphere, "Small beard", new Vector3(0f, 1.04f, 1.02f), new Vector3(.14f, .24f, .15f), cream);
-            tongue = HeadPart(PrimitiveType.Capsule, "Silly tongue", new Vector3(0f, 1.10f, 1.31f), new Vector3(.09f, .16f, .08f), tonguePink).transform;
-            Part(PrimitiveType.Sphere, "Short tail", new Vector3(0f, 0f, -.12f), new Vector3(.19f, .18f, .27f), cream, tailPivot);
-
-            int legIndex = 0;
+            // Small overlapping fleece locks break up the smooth primitive base.
             for (int side = -1; side <= 1; side += 2)
             {
-                foreach (float z in new[] { -.43f, .40f })
+                for (int i = 0; i < 5; i++)
                 {
-                    Transform leg = NewPivot($"Leg Pivot {legIndex}", visual, new Vector3(.27f * side, .54f, z));
-                    Part(PrimitiveType.Capsule, "Leg", new Vector3(0f, -.22f, 0f), new Vector3(.17f, .27f, .18f), coat, leg);
-                    Part(PrimitiveType.Sphere, "Hoof", new Vector3(0f, -.44f, .04f), new Vector3(.22f, .15f, .25f), hoof, leg);
-                    legPivots[legIndex++] = leg;
+                    float z = 0.48f - i * 0.27f;
+                    float y = 0.47f + (i % 2) * 0.11f;
+                    Part(PrimitiveType.Sphere, "Fleece lock", new Vector3(side * 0.38f, y, z), new Vector3(0.25f, 0.23f, 0.28f), coatMaterial);
                 }
-
-                var ear = HeadPart(PrimitiveType.Sphere, side < 0 ? "Left ear" : "Right ear", new Vector3(.36f * side, 1.43f, .69f), new Vector3(.29f, .13f, .22f), coat);
-                ear.transform.localRotation = Quaternion.Euler(0f, 0f, -20f * side);
-                ears[side < 0 ? 0 : 1] = ear.transform;
-                var hornBase = HeadPart(PrimitiveType.Capsule, "Horn base", new Vector3(.16f * side, 1.63f, .55f), new Vector3(.12f, .24f, .12f), horn);
-                hornBase.transform.localRotation = Quaternion.Euler(-15f, 0f, -20f * side);
-                var hornTip = HeadPart(PrimitiveType.Capsule, "Horn tip", new Vector3(.24f * side, 1.82f, .49f), new Vector3(.07f, .16f, .07f), horn);
-                hornTip.transform.localRotation = Quaternion.Euler(-25f, 0f, -35f * side);
-                if (side == 1) looseHorn = hornTip;
-                HeadPart(PrimitiveType.Sphere, "Eye white", new Vector3(.22f * side, 1.39f, .93f), new Vector3(.12f, .10f, .07f), eyeWhite);
-                HeadPart(PrimitiveType.Sphere, "Pupil", new Vector3(.25f * side, 1.39f, .99f), new Vector3(.055f, .06f, .045f), hoof);
             }
-        }
 
-        private void CacheRig()
-        {
-            torso = visual ? visual.Find("Torso Motion") : null;
-            headPivot = torso ? torso.Find("Head Motion") : null;
-            tailPivot = torso ? torso.Find("Tail Motion") : null;
-            looseHorn = headPivot ? headPivot.Find("Horn tip")?.gameObject : null;
-            looseScarf = torso ? torso.Find("Neckerchief")?.gameObject : null;
-            tongue = headPivot ? headPivot.Find("Silly tongue") : null;
-            ears[0] = headPivot ? headPivot.Find("Left ear") : null;
-            ears[1] = headPivot ? headPivot.Find("Right ear") : null;
-            for (int i = 0; i < legPivots.Length; i++)
-                legPivots[i] = visual ? visual.Find($"Leg Pivot {i}") : null;
-            importedAnimation = torso ? torso.Find("Refined FBX goat")?.GetComponentInChildren<Animation>() : null;
-        }
+            // Head, rounded muzzle, tiny nose and a readable smile/tongue.
+            Part(PrimitiveType.Sphere, "Bright white head", new Vector3(0f, 0.80f, 0.73f), new Vector3(0.71f, 0.67f, 0.68f), coatMaterial);
+            Part(PrimitiveType.Sphere, "Velvety muzzle", new Vector3(0f, 0.59f, 1.08f), new Vector3(0.42f, 0.30f, 0.35f), muzzleMaterial);
+            Part(PrimitiveType.Sphere, "Rose nose", new Vector3(0f, 0.73f, 1.385f), new Vector3(0.23f, 0.145f, 0.12f), pinkMaterial);
+            Part(PrimitiveType.Sphere, "Nostril", new Vector3(-0.068f, 0.745f, 1.483f), new Vector3(0.032f, 0.025f, 0.018f), mouthMaterial);
+            Part(PrimitiveType.Sphere, "Nostril", new Vector3(0.068f, 0.745f, 1.483f), new Vector3(0.032f, 0.025f, 0.018f), mouthMaterial);
 
-        private void AttachRefinedGoat()
-        {
-            if (!torso) return;
-            var model = torso.Find("Refined FBX goat");
-            if (!model)
+            // Curved smile built from short rounded links so it reads from the front.
+            TubeBetween("Smile", new Vector3(-0.19f, 0.535f, 1.385f), new Vector3(-0.095f, 0.49f, 1.405f), 0.018f, mouthMaterial);
+            TubeBetween("Smile", new Vector3(-0.095f, 0.49f, 1.405f), new Vector3(0f, 0.48f, 1.41f), 0.018f, mouthMaterial);
+            TubeBetween("Smile", new Vector3(0f, 0.48f, 1.41f), new Vector3(0.095f, 0.49f, 1.405f), 0.018f, mouthMaterial);
+            TubeBetween("Smile", new Vector3(0.095f, 0.49f, 1.405f), new Vector3(0.19f, 0.535f, 1.385f), 0.018f, mouthMaterial);
+            Part(PrimitiveType.Sphere, "Playful pink tongue", new Vector3(0f, 0.405f, 1.43f), new Vector3(0.14f, 0.19f, 0.095f), pinkMaterial);
+            TubeBetween("Tongue crease", new Vector3(0f, 0.44f, 1.51f), new Vector3(0f, 0.38f, 1.515f), 0.009f, mouthMaterial);
+
+            for (int side = -1; side <= 1; side += 2)
             {
-                var prefab = Resources.Load<GameObject>("GoatDuoRefined");
-                if (!prefab) return;
-                model = Instantiate(prefab, torso, false).transform;
-                model.name = "Refined FBX goat";
-                model.localPosition = Vector3.zero;
-                model.localRotation = Quaternion.identity;
-                model.localScale = Vector3.one * .78f;
+                // Oversized bright eyes with a glint make the face legible at game scale.
+                float eyeX = side * 0.265f;
+                Part(PrimitiveType.Sphere, "Eye white", new Vector3(eyeX, 0.91f, 1.255f), new Vector3(0.14f, 0.17f, 0.09f), eyeWhiteMaterial);
+                Part(PrimitiveType.Sphere, "Warm brown eye", new Vector3(eyeX, 0.90f, 1.333f), new Vector3(0.077f, 0.105f, 0.045f), eyeDarkMaterial);
+                Part(PrimitiveType.Sphere, "Eye sparkle", new Vector3(eyeX - 0.02f, 0.95f, 1.369f), new Vector3(0.027f, 0.033f, 0.018f), sparkleMaterial);
+                Part(PrimitiveType.Sphere, "Soft floppy ear", new Vector3(side * 0.50f, 0.91f, 0.61f), new Vector3(0.31f, 0.13f, 0.23f), coatMaterial)
+                    .transform.localRotation = Quaternion.Euler(0f, side * 18f, side * -12f);
+                Part(PrimitiveType.Sphere, "Pink ear inset", new Vector3(side * 0.58f, 0.925f, 0.66f), new Vector3(0.21f, 0.055f, 0.145f), pinkMaterial)
+                    .transform.localRotation = Quaternion.Euler(0f, side * 18f, side * -12f);
+
+                // Gently swept horns instead of the old blunt cylinders.
+                float hornSide = side * 0.29f;
+                TubeBetween("Horn base", new Vector3(hornSide, 1.12f, 0.76f), new Vector3(side * 0.34f, 1.34f, 0.72f), 0.085f, hornMaterial);
+                TubeBetween("Horn curl", new Vector3(side * 0.34f, 1.34f, 0.72f), new Vector3(side * 0.36f, 1.47f, 0.59f), 0.062f, hornMaterial);
+                TubeBetween("Horn tip", new Vector3(side * 0.36f, 1.47f, 0.59f), new Vector3(side * 0.31f, 1.50f, 0.48f), 0.034f, hornMaterial);
             }
-            // The old stylized parts remain as fragments for the comic crash effect.
-            // The old legs are siblings of Torso Motion, so hide the entire old rig.
-            foreach (var renderer in visual.GetComponentsInChildren<MeshRenderer>())
-                if (!renderer.transform.IsChildOf(model)) renderer.enabled = false;
-            importedAnimation = model.GetComponentInChildren<Animation>();
-            if (importedAnimation && importedAnimation["Goat_Idle"] != null)
+
+            // Four short legs and split visual hooves; the gameplay collider stays
+            // on the root and is never duplicated by the art.
+            for (int side = -1; side <= 1; side += 2)
+            for (int row = 0; row <= 1; row++)
             {
-                importedAnimation["Goat_Idle"].wrapMode = WrapMode.Loop;
-                if (importedAnimation["Goat_Walk"] != null)
-                    importedAnimation["Goat_Walk"].wrapMode = WrapMode.Loop;
-                importedAnimation.Play("Goat_Idle");
+                float z = row == 0 ? 0.46f : -0.55f;
+                float x = side * 0.29f;
+                TubeBetween("White lower leg", new Vector3(x, 0.15f, z), new Vector3(x, -0.28f, z), 0.10f, coatMaterial);
+                Part(PrimitiveType.Cube, "Charcoal cloven hoof", new Vector3(x, -0.37f, z + 0.025f), new Vector3(0.19f, 0.15f, 0.23f), hoofMaterial);
+                Part(PrimitiveType.Cube, "Hoof split", new Vector3(x, -0.372f, z + 0.142f), new Vector3(0.014f, 0.10f, 0.012f), mouthMaterial);
             }
+
+            Part(PrimitiveType.Sphere, "Little tail", new Vector3(0f, 0.40f, -0.70f), new Vector3(0.19f, 0.22f, 0.25f), coatMaterial);
+            Part(PrimitiveType.Sphere, "Tail puff", new Vector3(0f, 0.46f, -0.82f), new Vector3(0.22f, 0.20f, 0.20f), coatMaterial);
+
+            CombineByMaterial();
         }
 
-        private static Transform NewPivot(string name, Transform parent, Vector3 position)
+        private void EnsureMaterials()
         {
-            var pivot = new GameObject(name).transform;
-            pivot.SetParent(parent, false);
-            pivot.localPosition = position;
-            return pivot;
+            Shader shader = Shader.Find("Standard");
+            coatMaterial ??= MakeMaterial("Goat Snow-White Fleece", new Color(0.94f, 0.925f, 0.86f), shader, 0.22f);
+            muzzleMaterial ??= MakeMaterial("Goat Cream Muzzle", new Color(0.98f, 0.83f, 0.70f), shader, 0.24f);
+            hornMaterial ??= MakeMaterial("Goat Warm Ivory Horn", new Color(0.72f, 0.55f, 0.34f), shader, 0.2f);
+            hoofMaterial ??= MakeMaterial("Goat Slate Hoof", new Color(0.16f, 0.18f, 0.18f), shader, 0.18f);
+            mouthMaterial ??= MakeMaterial("Goat Deep Cocoa Details", new Color(0.20f, 0.105f, 0.085f), shader, 0.18f);
+            pinkMaterial ??= MakeMaterial("Goat Rose Nose and Tongue", new Color(0.93f, 0.31f, 0.39f), shader, 0.27f);
+            eyeWhiteMaterial ??= MakeMaterial("Goat Eye White", new Color(1f, 0.98f, 0.91f), shader, 0.16f);
+            eyeDarkMaterial ??= MakeMaterial("Goat Warm Eyes", new Color(0.22f, 0.105f, 0.055f), shader, 0.12f);
+            sparkleMaterial ??= MakeMaterial("Goat Eye Sparkle", Color.white, shader, 0.06f);
         }
 
-        private GameObject HeadPart(PrimitiveType type, string name, Vector3 position, Vector3 scale, Material material)
+        private static Material MakeMaterial(string name, Color color, Shader shader, float smoothness)
         {
-            return Part(type, name, position - headPivot.localPosition, scale, material, headPivot);
-        }
-
-        private static GameObject Part(PrimitiveType type, string name, Vector3 position, Vector3 scale, Material material, Transform parent)
-        {
-            Mesh sculpted = GoatShapeMesh.ForPart(name);
-            var part = sculpted ? new GameObject(name) : GameObject.CreatePrimitive(type);
-            part.name = name;
-            part.transform.SetParent(parent, false);
-            part.transform.localPosition = position;
-            part.transform.localScale = scale;
-            if (sculpted) part.AddComponent<MeshFilter>().sharedMesh = sculpted;
-            if (sculpted) part.AddComponent<MeshRenderer>();
-            part.GetComponent<Renderer>().sharedMaterial = material;
-            Collider collider = part.GetComponent<Collider>();
-            if (collider) Destroy(collider);
-            return part;
-        }
-
-        private static Material MakeMaterial(Color color)
-        {
-            var material = new Material(Shader.Find("Standard")) { color = color };
-            material.SetFloat("_Glossiness", .12f);
+            var material = new Material(shader) { name = name, color = color };
+            if (material.HasProperty("_Glossiness"))
+                material.SetFloat("_Glossiness", smoothness);
             return material;
         }
 
-        public void PlayTakeoff(float amount = .14f)
+        private GameObject Part(PrimitiveType type, string name, Vector3 position, Vector3 scale, Material material)
         {
-            squash = -Mathf.Clamp(amount, .08f, .28f);
-            impactJolt = -12f;
+            GameObject part = GameObject.CreatePrimitive(type);
+            part.name = name;
+            part.transform.SetParent(visual, false);
+            part.transform.localPosition = position;
+            part.transform.localScale = scale;
+            part.GetComponent<Renderer>().sharedMaterial = material;
+            Destroy(part.GetComponent<Collider>());
+            return part;
         }
 
-        public void PlayLanding(float impact)
+        private void TubeBetween(string name, Vector3 start, Vector3 end, float radius, Material material)
         {
-            squash = Mathf.Clamp(.10f + impact * .018f, .10f, .32f);
-            impactJolt = Mathf.Clamp(impact * 3f, 0f, 35f);
-            if (impact > 6.5f && !hornFlying && looseHorn) StartCoroutine(LaunchHorn());
+            Vector3 direction = end - start;
+            GameObject tube = Part(PrimitiveType.Capsule, name, (start + end) * 0.5f,
+                new Vector3(radius, direction.magnitude * 0.5f + radius, radius), material);
+            tube.transform.localRotation = Quaternion.FromToRotation(Vector3.up, direction.normalized);
         }
 
-        private System.Collections.IEnumerator LaunchHorn()
+        private void CombineByMaterial()
         {
-            hornFlying = true;
-            Toss(looseHorn, "Oops! Flying horn");
-            if (looseScarf) Toss(looseScarf, "Oops! Flying scarf");
-            yield return new WaitForSeconds(2.2f);
-            if (looseHorn) looseHorn.SetActive(true);
-            if (looseScarf) looseScarf.SetActive(true);
-            hornFlying = false;
-        }
+            var batches = new Dictionary<Material, List<CombineInstance>>();
+            var sourceParts = new List<GameObject>();
+            foreach (Transform child in visual)
+            {
+                MeshFilter filter = child.GetComponent<MeshFilter>();
+                MeshRenderer renderer = child.GetComponent<MeshRenderer>();
+                if (!filter || !renderer || !filter.sharedMesh)
+                    continue;
 
-        private static void Toss(GameObject original, string name)
-        {
-            var flying = Instantiate(original);
-            flying.name = name;
-            flying.transform.SetParent(null, true);
-            flying.AddComponent<SphereCollider>().radius = .5f;
-            var flyingBody = flying.AddComponent<Rigidbody>();
-            flyingBody.mass = .15f;
-            flyingBody.AddForce(Vector3.up * 3f + Random.insideUnitSphere * 2f, ForceMode.Impulse);
-            flyingBody.AddTorque(Random.insideUnitSphere * 5f, ForceMode.Impulse);
-            original.SetActive(false);
-            Destroy(flying, 2.6f);
+                if (!batches.TryGetValue(renderer.sharedMaterial, out List<CombineInstance> batch))
+                    batches.Add(renderer.sharedMaterial, batch = new List<CombineInstance>());
+                batch.Add(new CombineInstance
+                {
+                    mesh = filter.sharedMesh,
+                    transform = visual.worldToLocalMatrix * child.localToWorldMatrix
+                });
+                sourceParts.Add(child.gameObject);
+            }
+
+            foreach (KeyValuePair<Material, List<CombineInstance>> batch in batches)
+            {
+                var mesh = new Mesh { name = $"Goat {batch.Key.name} Combined" };
+                mesh.CombineMeshes(batch.Value.ToArray(), true, true, false);
+                var combined = new GameObject($"Goat {batch.Key.name} Mesh");
+                combined.transform.SetParent(visual, false);
+                combined.AddComponent<MeshFilter>().sharedMesh = mesh;
+                MeshRenderer renderer = combined.AddComponent<MeshRenderer>();
+                renderer.sharedMaterial = batch.Key;
+                renderer.shadowCastingMode = ShadowCastingMode.On;
+                renderer.receiveShadows = true;
+            }
+
+            foreach (GameObject source in sourceParts)
+                Destroy(source);
         }
 
         private void Update()
         {
             body ??= GetComponent<Rigidbody>();
             ground ??= GetComponent<GoatGroundDetector>();
-            visual ??= transform.Find(RootName);
-            if (!visual || !body) return;
-            if (!torso)
+            visual ??= transform.Find(VisualName);
+            if (!visual || !body)
+                return;
+
+            if (importedAnimation != null && !surpriseEarMaskReady)
+                ConfigureSurpriseEarMask();
+
+            if (!MountainAuthority.IsHost)
             {
-                if (!visual.Find("Torso Motion"))
+                if (importedAnimation && !string.IsNullOrEmpty(networkClip)
+                    && importedAnimation[networkClip] != null && activeAutomaticClip != networkClip)
                 {
-                    Destroy(visual.gameObject);
-                    BuildVisual();
+                    importedAnimation[networkClip].wrapMode = IsLoop(networkClip) ? WrapMode.Loop : WrapMode.Once;
+                    importedAnimation.CrossFade(networkClip, .12f, PlayMode.StopSameLayer);
+                    activeAutomaticClip = networkClip;
                 }
-                CacheRig();
-                AttachRefinedGoat();
+                if (networkFacing.sqrMagnitude > .01f)
+                    visual.rotation = Quaternion.Slerp(visual.rotation,
+                        Quaternion.LookRotation(networkFacing, Vector3.up), 1f - Mathf.Exp(-15f * Time.deltaTime));
+                return;
+            }
+
+            if (importedAnimation != null)
+            {
+                if (GoatLocalControl.AllowsInput(this) && !(GetComponent<GoatInteraction>()?.IsBusy ?? false)) ReadAnimationHotkeys();
+                if (!string.IsNullOrEmpty(manualActionClip) && Time.time >= manualActionUntil)
+                    manualActionClip = null;
+
+                var goat = GetComponent<GoatController>();
+                if (goat && (goat.IsPredatorCarried || (ground && !ground.IsGrounded && body.linearVelocity.y < -3f)))
+                    manualActionClip = null;
+
+                if (string.IsNullOrEmpty(manualActionClip))
+                {
+                    Vector3 velocity = body.linearVelocity;
+                    velocity.y = 0f;
+                    string clip = goat && goat.IsPredatorCarried ? "Goat_Idle"
+                        : ground && !ground.IsGrounded
+                            ? "Goat_Jump"
+                            : velocity.sqrMagnitude > .2f ? "Goat_Walk" : "Goat_Idle";
+                    var pair = GetComponent<GoatInteraction>();
+                    if (pair && pair.IsLinked && !(goat && goat.IsPredatorCarried))
+                    {
+                        if (pair.IsHolding)
+                        {
+                            clip = pair.IsPulling ? "Goat_Pull"
+                                : pair.Partner && !pair.Partner.GetComponent<GoatGroundDetector>().IsGrounded
+                                    ? "Goat_RescueBrace" : "Goat_GrabHold";
+                        }
+                        else
+                            clip = ground && ground.IsGrounded ? "Goat_GrabbedHold" : "Goat_GripStrain";
+                    }
+                    if (importedAnimation[clip] == null) clip = "Goat_Idle";
+                    if (!importedAnimation.IsPlaying(clip))
+                    {
+                        importedAnimation[clip].wrapMode = IsLoop(clip) ? WrapMode.Loop : WrapMode.Once;
+                        importedAnimation.CrossFade(clip, .15f);
+                        if (activeAutomaticClip != clip)
+                        {
+                            activeAutomaticClip = clip;
+                            if (!(pair && pair.IsLinked)) ApplySurpriseEarsForAction(clip);
+                        }
+                    }
+                }
+            }
+
+            if (GetComponent<GoatPhysicalBody>()?.RootIsTumbling == true)
+            {
+                visual.rotation = body.rotation;
+                return;
             }
 
             Vector3 horizontal = body.linearVelocity;
             horizontal.y = 0f;
-            float speed = horizontal.magnitude;
-            bool grounded = ground && ground.IsGrounded;
-            if (speed > .45f)
+            if (Time.time < faceUntil && interactionFacing.sqrMagnitude > .01f)
             {
-                Quaternion facing = Quaternion.LookRotation(horizontal.normalized, grounded ? ground.GroundNormal : Vector3.up);
-                visual.rotation = Quaternion.Slerp(visual.rotation, facing, 1f - Mathf.Exp(-10f * Time.deltaTime));
+                visual.rotation = Quaternion.Slerp(visual.rotation, Quaternion.LookRotation(interactionFacing, Vector3.up), 1f - Mathf.Exp(-16f * Time.deltaTime));
+            }
+            else if (horizontal.sqrMagnitude > 0.2f)
+            {
+                Vector3 up = ground && ground.IsGrounded ? ground.GroundNormal : Vector3.up;
+                Quaternion target = Quaternion.LookRotation(horizontal.normalized, up);
+                visual.rotation = Quaternion.Slerp(visual.rotation, target, Time.deltaTime * 9f);
             }
 
-            Vector3 acceleration = hasPreviousVelocity && Time.deltaTime > .0001f
-                ? Vector3.ClampMagnitude((body.linearVelocity - previousVelocity) / Time.deltaTime, 24f)
-                : Vector3.zero;
-            previousVelocity = body.linearVelocity;
-            hasPreviousVelocity = true;
-            Vector3 localAcceleration = visual.InverseTransformDirection(acceleration);
-            float step = Mathf.Min(Time.deltaTime, .04f);
-            float pitchTarget = Mathf.Clamp(-localAcceleration.z * 1.5f - body.linearVelocity.y * 1.2f, -26f, 26f);
-            float rollTarget = Mathf.Clamp(localAcceleration.x * 2.2f, -24f, 24f);
-            Spring(ref torsoPitch, ref torsoPitchSpeed, pitchTarget + impactJolt, 11f, .48f, step);
-            var balance = GetComponent<GoatSlopeBalance>();
-            Spring(ref torsoRoll, ref torsoRollSpeed, rollTarget + (balance ? balance.LeanDegrees : 0f), 10f, .5f, step);
-            Spring(ref headPitch, ref headPitchSpeed, -torsoPitch * .55f + impactJolt * .7f, 13f, .38f, step);
-            Spring(ref headRoll, ref headRollSpeed, -torsoRoll * .65f, 12f, .45f, step);
-            Spring(ref earFlop, ref earFlopSpeed, Mathf.Clamp(speed * 1.3f + Mathf.Abs(localAcceleration.z) * .8f + impactJolt, 0f, 38f), 14f, .3f, step);
-            Spring(ref tailSwing, ref tailSwingSpeed, Mathf.Clamp(-localAcceleration.x * 3f, -35f, 35f), 9f, .35f, step);
-            impactJolt = Mathf.MoveTowards(impactJolt, 0f, Time.deltaTime * 65f);
+            visual.localScale = Vector3.one;
+        }
 
-            float moveAmount = Mathf.Clamp01(speed / 4f);
-            gaitWeight = Mathf.MoveTowards(gaitWeight, grounded ? moveAmount : 0f, Time.deltaTime * 5f);
-            walkCycle += speed * Time.deltaTime * 7f;
-            for (int i = 0; i < legPivots.Length; i++)
+        public void PlayNetworkAction(byte action)
+        {
+            if (!MountainAuthority.IsHost || action == 0) return;
+            switch (action)
             {
-                if (!legPivots[i]) continue;
-                float phase = i == 0 || i == 3 ? 0f : Mathf.PI;
-                float swing = grounded ? Mathf.Sin(walkCycle + phase) * gaitWeight * 24f : (i == 1 || i == 3 ? -20f : 18f);
-                legPivots[i].localRotation = Quaternion.Euler(swing, 0f, 0f);
-            }
-
-            float bob = grounded ? Mathf.Abs(Mathf.Sin(walkCycle)) * gaitWeight * .045f : 0f;
-            if (torso)
-            {
-                if (!grounded && body.linearVelocity.y < -3f)
-                    tumble += Time.deltaTime * Mathf.Min(150f, -body.linearVelocity.y * 14f);
-                else tumble = Mathf.MoveTowardsAngle(tumble, 0f, Time.deltaTime * 400f);
-                torso.localPosition = new Vector3(0f, bob + Mathf.Sin(Time.time * 2.3f) * .008f
-                    - (preparingJump && grounded ? .13f : 0f), 0f);
-                torso.localRotation = Quaternion.Euler((grounded ? Mathf.Sin(walkCycle) * gaitWeight * 3f : -5f)
-                    + tumble + torsoPitch + (preparingJump && grounded ? 7f : 0f), 0f,
-                    (grounded ? Mathf.Cos(walkCycle) * gaitWeight * 2f : 0f) + torsoRoll);
-            }
-            if (headPivot) headPivot.localRotation = Quaternion.Euler(headPitch + Mathf.Sin(Time.time * 2.5f) * 2f, 0f, headRoll);
-            if (tailPivot) tailPivot.localRotation = Quaternion.Euler(0f, tailSwing + Mathf.Sin(Time.time * 7f) * (6f + moveAmount * 13f), 0f);
-            for (int i = 0; i < ears.Length; i++)
-                if (ears[i]) ears[i].localRotation = Quaternion.Euler(-earFlop * .55f, 0f, (i == 0 ? 1f : -1f) * (20f + earFlop));
-            if (tongue)
-            {
-                float tongueOut = Mathf.Clamp01((speed - 5f) / 7f + (!grounded ? .45f : 0f));
-                tongue.localScale = new Vector3(.09f, Mathf.Lerp(.01f, .20f, tongueOut), .08f);
-                tongue.localRotation = Quaternion.Euler(Mathf.Sin(Time.time * 16f) * tongueOut * 18f, 0f, 0f);
-            }
-
-            squash = Mathf.MoveTowards(squash, 0f, Time.deltaTime * 1.5f);
-            visual.localScale = new Vector3(1f + squash * .35f, 1f - squash, 1f + squash * .35f);
-            if (importedAnimation)
-            {
-                string action = !grounded ? "Goat_Jump" : speed > .85f ? "Goat_Walk" : "Goat_Idle";
-                if (importedAnimation[action] != null && !importedAnimation.IsPlaying(action))
-                    importedAnimation.CrossFade(action, .13f);
+                case 1: PlayManualAction("Goat_EatGrass"); break;
+                case 2: PlayManualAction("Goat_Pee"); break;
+                case 3: PlayManualAction("Goat_Poop"); break;
+                case 4: PlayManualAction("Goat_Sequence"); break;
+                case 5: PlayManualAction("GoatA_Duo_Performance"); break;
+                case 6: PlayManualAction("GoatB_Duo_Performance"); break;
+                case 7: TriggerSurprise(); break;
             }
         }
 
-        private static void Spring(ref float value, ref float velocity, float target, float frequency, float damping, float dt)
+        private void ReadAnimationHotkeys()
         {
-            velocity += ((target - value) * frequency * frequency - 2f * damping * frequency * velocity) * dt;
-            value += velocity * dt;
+            if (Input.GetKeyDown(KeyCode.Q)) PlayManualAction("Goat_EatGrass");
+            else if (Input.GetKeyDown(KeyCode.E)) PlayManualAction("Goat_Pee");
+            else if (Input.GetKeyDown(KeyCode.C)) PlayManualAction("Goat_Poop");
+            else if (Input.GetKeyDown(KeyCode.V)) PlayManualAction("Goat_Sequence");
+            else if (Input.GetKeyDown(KeyCode.Z)) PlayManualAction("GoatA_Duo_Performance");
+            else if (Input.GetKeyDown(KeyCode.X)) PlayManualAction("GoatB_Duo_Performance");
+            else if (Input.GetKeyDown(KeyCode.T)) TriggerSurprise();
+        }
+
+        /// <summary>Plays the startled ear-flick reaction; gameplay events can call this directly.</summary>
+        public void TriggerSurprise() => PlayManualAction("Goat_Surprise");
+
+        private void PlayManualAction(string clipName)
+        {
+            AnimationState state = importedAnimation[clipName];
+            if (state == null)
+            {
+                Debug.LogWarning($"Goat animation clip '{clipName}' is missing from GoatDuoRefined.");
+                return;
+            }
+
+            if (clipName == "Goat_Surprise")
+            {
+                PlaySurpriseEarOverlay();
+                return;
+            }
+
+            state.wrapMode = WrapMode.Once;
+            state.time = 0f;
+            state.speed = 1f;
+            manualActionClip = clipName;
+            manualActionUntil = Time.time + Mathf.Max(state.length, 0.25f);
+            activeAutomaticClip = clipName;
+            importedAnimation.CrossFade(clipName, 0.2f, PlayMode.StopSameLayer);
+            ApplySurpriseEarsForAction(clipName);
+        }
+
+        private void ApplySurpriseEarsForAction(string clipName)
+        {
+            if (ShouldAutoTriggerSurpriseEars(clipName))
+                PlaySurpriseEarOverlay();
+            else if (importedAnimation)
+                importedAnimation.Stop("Goat_Surprise");
+        }
+
+        private void ConfigureSurpriseEarMask()
+        {
+            AnimationState state = importedAnimation?["Goat_Surprise"];
+            if (state == null || !visual) return;
+
+            Transform leftEar = FindBone(visual, "Ear.L");
+            Transform rightEar = FindBone(visual, "Ear.R");
+            if (!leftEar || !rightEar)
+            {
+                Debug.LogWarning("Goat surprise ear animation is missing Ear.L or Ear.R in the imported rig.");
+                return;
+            }
+
+            state.layer = 1;
+            state.blendMode = AnimationBlendMode.Blend;
+            state.AddMixingTransform(leftEar);
+            state.AddMixingTransform(rightEar);
+            surpriseEarMaskReady = true;
+        }
+
+        private void PlaySurpriseEarOverlay()
+        {
+            if (!importedAnimation) return;
+            if (!surpriseEarMaskReady) ConfigureSurpriseEarMask();
+
+            AnimationState state = importedAnimation["Goat_Surprise"];
+            if (state == null || !surpriseEarMaskReady) return;
+            state.wrapMode = WrapMode.Once;
+            state.time = 0f;
+            state.speed = 1f;
+            state.weight = 1f;
+            importedAnimation.CrossFade("Goat_Surprise", 0.15f, PlayMode.StopSameLayer);
+        }
+
+        private static bool ShouldAutoTriggerSurpriseEars(string clipName)
+        {
+            return clipName != "Goat_Idle"
+                && clipName != "Goat_Walk"
+                && clipName != "Goat_EatGrass"
+                && clipName != "Goat_Surprise";
+        }
+
+        private static Transform FindBone(Transform root, string boneName)
+        {
+            foreach (Transform child in root)
+            {
+                if (child.name == boneName) return child;
+                Transform nested = FindBone(child, boneName);
+                if (nested) return nested;
+            }
+            return null;
+        }
+
+        private void OnGUI()
+        {
+            if (importedAnimation == null || !GoatLocalControl.AllowsInput(this))
+                return;
+
+            animationHelpStyle ??= new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 15,
+                normal = { textColor = new Color(1f, 1f, 1f, 0.94f) }
+            };
+            GUI.Label(new Rect(25, 108, 960, 24),
+                "Анимации: Q — трава   E — пописать   C — покакать   T — удивление   V — весь ролик   Z/X — роли дуэта",
+                animationHelpStyle);
         }
     }
-
 }
