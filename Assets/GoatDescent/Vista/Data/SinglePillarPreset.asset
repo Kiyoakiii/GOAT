@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a96b6dfdc5eb5045ba9e4b4cbe9f6cb, type: 3}
+  m_Name: SinglePillarPreset
+  m_EditorClassIdentifier: GoatDescent.ProceduralWorld.Runtime::GoatDescent.ProceduralWorld.PillarPreset
+  height: 335
+  rx: 62
+  rz: 47
+  seed: 33
+  detail: 0
+  terraceBoost: 1
+  platformRadius: 14
+  platformThickness: 14
+  generateOnStart: 0
+  spawnGoat: 1

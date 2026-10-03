@@ -8,10 +8,27 @@
 [Uu]ser[Ss]ettings/
 [Mm]emoryCaptures/
 
+# Generated terrain/mesh assets (recreated by generator scripts)
+Assets/Art/Generated/Materials/
+Assets/Art/Generated/Terrain/
+Assets/GoatDescent/Vista/Generated/
+
+# Local audit reports and CI screenshots
+/ProjectAuditReport.csv
+/ProjectAuditReport.projectauditor
+/*.png
+
 # IDE and OS files
 .vs/
 .vscode/
 .idea/
+
+# Agent / skills / config dot-directories
+.opencode/
+.claude/
+.agents/
+.cursor/
+.config/
 *.csproj
 *.sln
 *.user

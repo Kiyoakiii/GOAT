@@ -149,26 +149,38 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GoatDescent.MountainSceneBuilder
   settings:
-    Radius: 180
-    SummitY: 260
-    ValleyY: -10
-    Elongation: 1
-    WarpAmplitude: 18
-    CouloirCount: 5
-    TopRadius: 0.34
-    CliffDrop: 0.8
-    StrataCount: 10
-    NoiseAmplitude: 3
+    Radius: 55
+    SummitY: 130
+    ValleyY: -6
+    CouloirCount: 4
+    StrataCount: 8
+    NoiseAmplitude: 3.2
+    WarpAmplitude: 8
+    Asymmetry: 6
+    PeakOffset: 8
+    Stretch: 0.4
     Seed: 7
+    RidgeFraction: 0.16
+    ErosionStrength: 1
+    TalusStrength: 1
+    TalusAngle: 38
     EnableRoute: 1
-    PlatformCount: 14
-    EnableGrotto: 1
-    GrottoRadius: 6
+    PlatformCount: 24
+    PlatformStep: 5
+    PlatformSize: 4
+    PlatformGap: 0.8
+    Difficulty: 0.5
+    EnableBranches: 1
+    EnablePlatformTypes: 1
+    EnableWind: 1
+    CheckpointRespawn: 1
     EnableDecor: 1
-    BushCount: 60
-    RockCount: 45
-    GridX: 200
-    GridZ: 200
+    BushCount: 260
+    RockCount: 90
+    TreeCount: 220
+    FlowerCount: 300
+    GrassTuftCount: 700
+    Grid: 200
 --- !u!4 &264521113
 Transform:
   m_ObjectHideFlags: 0

@@ -1,0 +1,17 @@
+{
+    "name": "GoatDescent.ProceduralWorld.Runtime",
+    "rootNamespace": "GoatDescent.ProceduralWorld",
+    "references": [
+        "GoatDescent.Player",
+        "GoatDescent.Terrain"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
