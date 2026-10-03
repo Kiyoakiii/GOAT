@@ -164,7 +164,7 @@ namespace GoatDescent.ProceduralWorld
             Transform marker = ResolveSpawnMarker();
             Vector3 position = marker ? marker.position : transform.position;
             float yaw = marker ? marker.rotation.eulerAngles.y : 0f;
-            GoatDescent.GoatPlayerFactory.Create(position, yaw, true, 2600f);
+            GoatDescent.GoatPlayerFactory.Create(position, yaw, true);
         }
 
         private Transform ResolveSpawnMarker()
