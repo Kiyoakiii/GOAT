@@ -87,7 +87,16 @@ namespace GoatDescent.ProceduralWorld
 
             Material rock = MakeMaterial("GoatDescent/Weathered Sandstone", new Color(.52f, .45f, .35f));
             Material foliage = MakeMaterial("GoatDescent/Valley Foliage", new Color(.19f, .27f, .19f));
-            Material bark = MakeMaterial("Standard", new Color(.17f, .14f, .10f));
+            Material bark = MakeMaterial("GoatDescent/Valley Foliage", new Color(.18f, .13f, .09f));
+            if (rock.HasProperty("_RockTex") && GoatDescent.MountainMaterial.Load("rock_color"))
+                rock.SetTexture("_RockTex", GoatDescent.MountainMaterial.Load("rock_color"));
+            if (rock.HasProperty("_TexInfluence")) rock.SetFloat("_TexInfluence", .5f);
+            if (foliage.HasProperty("_SwayAmount")) foliage.SetFloat("_SwayAmount", .16f);
+            if (bark.HasProperty("_LeafDark")) bark.SetColor("_LeafDark", new Color(.1f, .075f, .055f));
+            if (bark.HasProperty("_LeafLight")) bark.SetColor("_LeafLight", new Color(.3f, .21f, .13f));
+            if (bark.HasProperty("_SwayAmount")) bark.SetFloat("_SwayAmount", 0f);
+            if (bark.HasProperty("_RampSteps")) bark.SetFloat("_RampSteps", 2f);
+            if (bark.HasProperty("_RimStrength")) bark.SetFloat("_RimStrength", .12f);
             runtimeAssets.Add(rock); runtimeAssets.Add(foliage); runtimeAssets.Add(bark);
 
             var sink = new RuntimeMeshSink(runtimeAssets);

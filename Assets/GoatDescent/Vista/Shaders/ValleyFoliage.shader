@@ -8,17 +8,29 @@ Shader "GoatDescent/Valley Foliage"
         _RampSteps ("Light Steps", Range(2, 6)) = 2
         _RimStrength ("Rim Light", Range(0, 1)) = 0.35
         _RimColor ("Rim Color", Color) = (1,.95,.72,1)
+        _SwayAmount ("Wind Sway", Float) = 0
+        _SwayFrequency ("Wind Frequency", Float) = 1.1
     }
     SubShader
     {
         Tags { "RenderType"="Opaque" "Queue"="Geometry" }
         LOD 200
         CGPROGRAM
-        #pragma surface surf ToonFoliage fullforwardshadows
+        #pragma surface surf ToonFoliage vertex:vert fullforwardshadows
         #pragma target 3.0
         fixed4 _Color, _LeafDark, _LeafLight, _RimColor;
-        float _RampSteps, _RimStrength;
+        float _RampSteps, _RimStrength, _SwayAmount, _SwayFrequency;
         struct Input { float3 worldPos; float4 color : COLOR; };
+
+        void vert(inout appdata_full v)
+        {
+            if (_SwayAmount <= 0.0) return;
+            float3 w = mul(unity_ObjectToWorld, v.vertex).xyz;
+            float phase = _Time.y * _SwayFrequency + w.x * .08 + w.z * .07 + w.y * .05;
+            float sway = sin(phase) + .5 * sin(phase * 1.73 + 1.3);
+            v.vertex.x += sway * _SwayAmount;
+            v.vertex.z += sway * _SwayAmount * .6;
+        }
 
         half4 LightingToonFoliage(SurfaceOutput s, half3 lightDir, half3 viewDir, half atten)
         {

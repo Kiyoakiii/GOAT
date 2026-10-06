@@ -11,6 +11,9 @@ Shader "GoatDescent/Weathered Sandstone"
         _MossAmount ("Moss Amount", Range(0, 1)) = 0.55
         _StratumStrength ("Strata Strength", Range(0, 1)) = 0.45
         _ShadowTint ("Shadow Tint", Color) = (.62,.47,.32,1)
+        [NoScaleOffset] _RockTex ("Rock Detail", 2D) = "gray" {}
+        _TexScale ("Detail Scale", Float) = 0.09
+        _TexInfluence ("Detail Influence", Range(0, 1)) = 0.45
     }
     SubShader
     {
@@ -21,7 +24,9 @@ Shader "GoatDescent/Weathered Sandstone"
         #pragma target 3.0
         fixed4 _StoneColor, _ShadowStone, _MossColor, _RimColor, _ShadowTint;
         float _RampSteps, _RimStrength, _MossAmount, _StratumStrength;
-        struct Input { float3 worldPos; float4 color : COLOR; };
+        float _TexScale, _TexInfluence;
+        sampler2D _RockTex;
+        struct Input { float3 worldPos; float3 worldNormal; INTERNAL_DATA float4 color : COLOR; };
 
         float hash31(float3 p) { p=frac(p*.1031); p+=dot(p,p.yzx+33.33); return frac((p.x+p.y)*p.z); }
         float noise3(float3 p)
@@ -55,6 +60,14 @@ Shader "GoatDescent/Weathered Sandstone"
             float3 stone=lerp(_ShadowStone.rgb,_StoneColor.rgb,stain*.78+.22);
             stone*=0.82+broad*.28+fine*.14;
             stone=lerp(stone, stone*.85, band*_StratumStrength);
+
+            float3 n=normalize(WorldNormalVector(IN, float3(0,1,0)));
+            float3 triW=pow(abs(n),4.0);
+            triW/=max(.001,triW.x+triW.y+triW.z);
+            float3 detail=triW.z*tex2D(_RockTex,p.xy*_TexScale).rgb
+                +triW.x*tex2D(_RockTex,p.zy*_TexScale).rgb
+                +triW.y*tex2D(_RockTex,p.xz*_TexScale).rgb;
+            stone*=lerp(1.0,.72+.62*detail,_TexInfluence);
 
             float heightTone=IN.color.g;
             stone=lerp(stone, _StoneColor.rgb*1.12, smoothstep(.55,.85,heightTone));

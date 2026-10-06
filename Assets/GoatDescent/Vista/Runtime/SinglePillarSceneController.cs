@@ -81,7 +81,7 @@ namespace GoatDescent.ProceduralWorld
 
             Material rock = MakeRockMaterial();
             Material foliage = MakeFoliageMaterial();
-            Material bark = MakePlainMaterial(new Color(.25f, .18f, .12f));
+            Material bark = MakeBarkMaterial();
             runtimeAssets.Add(rock); runtimeAssets.Add(foliage); runtimeAssets.Add(bark);
 
             var sink = new RuntimeMeshSink(runtimeAssets);
@@ -211,15 +211,6 @@ namespace GoatDescent.ProceduralWorld
             return new Color(1f, grass, 0f, 0f);
         }
 
-        private static Material MakePlainMaterial(Color color)
-        {
-            Shader shader = Shader.Find("Standard");
-            var material = new Material(shader ? shader : Shader.Find("Legacy Shaders/Diffuse"));
-            if (material.HasProperty("_Color")) material.SetColor("_Color", color);
-            if (material.HasProperty("_Glossiness")) material.SetFloat("_Glossiness", .08f);
-            return material;
-        }
-
         private static Material MakeRockMaterial()
         {
             Shader shader = Shader.Find("GoatDescent/Mountain");
@@ -228,13 +219,14 @@ namespace GoatDescent.ProceduralWorld
             material.SetTexture("_DirtTex", GoatDescent.MountainMaterial.Load("rock_color"));
             material.SetTexture("_GrassTex", GoatDescent.MountainMaterial.Load("grass_color"));
             material.SetTexture("_RockTex", GoatDescent.MountainMaterial.Load("rock_color"));
-            material.SetFloat("_Tiling", .045f);
-            material.SetFloat("_DetailTiling", .12f);
+            material.SetFloat("_Tiling", .08f);
+            material.SetFloat("_DetailTiling", .35f);
+            material.SetFloat("_BumpScale", 1.35f);
             material.SetFloat("_Steep", .53f);
             material.SetFloat("_Fade", .14f);
             material.SetFloat("_GrassEnd", 2f);
             material.SetFloat("_SnowStart", 2f);
-            material.SetFloat("_GrassBlend", .82f);
+            material.SetFloat("_GrassBlend", .72f);
             material.SetFloat("_HeightMin", 0f);
             material.SetFloat("_HeightMax", 400f);
             material.SetFloat("_BumpScale", .6f);
@@ -256,6 +248,21 @@ namespace GoatDescent.ProceduralWorld
             if (material.HasProperty("_Glossiness")) material.SetFloat("_Glossiness", .06f);
             if (material.HasProperty("_RampSteps")) material.SetFloat("_RampSteps", 3f);
             if (material.HasProperty("_RimStrength")) material.SetFloat("_RimStrength", .4f);
+            if (material.HasProperty("_SwayAmount")) material.SetFloat("_SwayAmount", .16f);
+            return material;
+        }
+
+        private static Material MakeBarkMaterial()
+        {
+            Shader shader = Shader.Find("GoatDescent/Valley Foliage");
+            var material = new Material(shader ? shader : Shader.Find("Standard"));
+            if (material.HasProperty("_Color")) material.SetColor("_Color", new Color(.2f, .14f, .1f));
+            if (material.HasProperty("_LeafDark")) material.SetColor("_LeafDark", new Color(.1f, .075f, .055f));
+            if (material.HasProperty("_LeafLight")) material.SetColor("_LeafLight", new Color(.32f, .22f, .13f));
+            if (material.HasProperty("_RimColor")) material.SetColor("_RimColor", new Color(1f, .85f, .6f));
+            if (material.HasProperty("_RampSteps")) material.SetFloat("_RampSteps", 2f);
+            if (material.HasProperty("_RimStrength")) material.SetFloat("_RimStrength", .12f);
+            if (material.HasProperty("_SwayAmount")) material.SetFloat("_SwayAmount", 0f);
             return material;
         }
     }
