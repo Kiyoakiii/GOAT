@@ -35,6 +35,14 @@ namespace GoatDescent.EditorTools
         public static void ShootSinglePillar()
         {
             EditorSceneManager.OpenScene("Assets/GoatDescent/Scenes/Testing/SinglePillarPlayground.unity", OpenSceneMode.Single);
+            var controller = Object.FindFirstObjectByType<GoatDescent.ProceduralWorld.SinglePillarSceneController>(FindObjectsInactive.Include);
+            if (controller)
+            {
+                controller.ClearGenerated();
+                controller.Generate();
+                EditorSceneManager.SaveOpenScenes();
+                Debug.Log("VISTA_SHOT regenerated single pillar playground");
+            }
             var camGo = new GameObject("shot-cam");
             var cam = camGo.AddComponent<Camera>();
             cam.transform.position = new Vector3(150f, 250f, -150f);
@@ -50,9 +58,20 @@ namespace GoatDescent.EditorTools
             File.WriteAllBytes("C:/Users/Вадим/Unity Projects/GOAT/pillar-side.png", tex.EncodeToPNG());
             RenderTexture.active = null;
             Object.DestroyImmediate(tex);
+            cam.targetTexture = rt;
+            cam.transform.position = new Vector3(170f, 430f, -190f);
+            cam.transform.LookAt(new Vector3(0f, 320f, 0f));
+            cam.Render();
+            RenderTexture.active = rt;
+            var topTex = new Texture2D(1280, 720, TextureFormat.RGB24, false);
+            topTex.ReadPixels(new Rect(0, 0, 1280, 720), 0, 0);
+            topTex.Apply();
+            File.WriteAllBytes("C:/Users/Вадим/Unity Projects/GOAT/pillar-top.png", topTex.EncodeToPNG());
+            RenderTexture.active = null;
+            Object.DestroyImmediate(topTex);
             Object.DestroyImmediate(camGo);
             Object.DestroyImmediate(rt);
-            Debug.Log("VISTA_SHOT saved pillar-side.png");
+            Debug.Log("VISTA_SHOT saved pillar-side.png and pillar-top.png");
             EditorApplication.Exit(0);
         }
 

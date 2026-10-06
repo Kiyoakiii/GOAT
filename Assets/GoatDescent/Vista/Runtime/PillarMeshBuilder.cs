@@ -30,7 +30,30 @@ namespace GoatDescent.ProceduralWorld
                     float angle = s / (float)sides * Mathf.PI * 2f;
                     Vector3 u = new Vector3(Mathf.Sin(lat) * Mathf.Cos(angle), Mathf.Cos(lat), Mathf.Sin(lat) * Mathf.Sin(angle));
                     float wobble = 1f + .18f * Noise(u.x * 4f + u.y, u.z * 4f + u.y * 3f, seed);
-                    float shade = .8f + .2f * u.y + .1f * Noise(u.x * 8f, u.z * 8f, seed);
+                    float shade = .68f + .3f * u.y + .1f * Noise(u.x * 8f, u.z * 8f, seed);
+                    AddVertex(center + Vector3.Scale(u, scale) * wobble, new Color(tint.r * shade, tint.g * shade, tint.b * shade, 1f));
+                }
+            }
+            for (int r = 0; r < rings; r++)
+            for (int s = 0; s < sides; s++)
+            {
+                int a = first + r * (sides + 1) + s, b = a + 1, c = a + sides + 1, d = c + 1;
+                Triangle(a, b, c); Triangle(b, d, c);
+            }
+        }
+
+        public void AddDome(Vector3 center, Vector3 scale, int seed, Color tint, int sides, int rings)
+        {
+            int first = vertices.Count;
+            for (int r = 0; r <= rings; r++)
+            {
+                float lat = r / (float)rings * Mathf.PI * .5f;
+                for (int s = 0; s <= sides; s++)
+                {
+                    float angle = s / (float)sides * Mathf.PI * 2f;
+                    Vector3 u = new Vector3(Mathf.Sin(lat) * Mathf.Cos(angle), Mathf.Cos(lat), Mathf.Sin(lat) * Mathf.Sin(angle));
+                    float wobble = 1f + .13f * Noise(u.x * 3.1f + u.y * 2.2f, u.z * 3.3f - u.y * 1.7f, seed);
+                    float shade = .62f + .38f * u.y * u.y;
                     AddVertex(center + Vector3.Scale(u, scale) * wobble, new Color(tint.r * shade, tint.g * shade, tint.b * shade, 1f));
                 }
             }

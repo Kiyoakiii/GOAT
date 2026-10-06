@@ -7,6 +7,7 @@ namespace GoatDescent.ProceduralWorld
     {
         public const string RootName = "Single pillar playground";
         public const string PlatformName = "Summit platform";
+        private const int FloorSectors = 72;
 
         [Header("Pillar")]
         [SerializeField] private float height = 335f;
@@ -86,7 +87,7 @@ namespace GoatDescent.ProceduralWorld
             var sink = new RuntimeMeshSink(runtimeAssets);
             MistyPillarsVistaBuilder.CreateTower(root.transform,
                 new MistyPillarsVistaBuilder.TowerSpec(Vector3.zero, height, rx, rz, seed, detail, terraceBoost, true),
-                rock, foliage, bark, sink, false, Vector2.zero, platformRadius + 14f);
+                rock, foliage, bark, sink, false, Vector2.zero, platformRadius + 6f);
 
             var platformObject = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             platformObject.name = PlatformName;
@@ -106,20 +107,45 @@ namespace GoatDescent.ProceduralWorld
             platformObject.AddComponent<GoatDescent.MountainSlopeSurface>();
             Physics.SyncTransforms();
 
-            var ground = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            ground.name = "Valley floor";
+            var ground = new GameObject("Valley floor");
             ground.transform.SetParent(root.transform, false);
-            ground.transform.localPosition = new Vector3(0f, -.5f, 0f);
-            ground.transform.localScale = new Vector3(1600f, .5f, 1600f);
-            Object.DestroyImmediate(ground.GetComponent<Collider>());
-            var groundFilter = ground.GetComponent<MeshFilter>();
-            var groundMesh = groundFilter.mesh;
-            var groundColors = new Color[groundMesh.vertexCount];
-            for (int i = 0; i < groundColors.Length; i++) groundColors[i] = new Color(1f, .7f, 0f, 0f);
-            groundMesh.colors = groundColors;
+            const float floorRadius = 800f;
+            const int floorRings = 18;
+            var floorVertices = new List<Vector3>(1 + (floorRings + 1) * (FloorSectors + 1)) { new Vector3(0f, 0f, 0f) };
+            var floorColors = new List<Color>(floorVertices.Capacity) { FloorTint(0f, 0f) };
+            for (int r = 1; r <= floorRings; r++)
+            {
+                float ringRadius = floorRadius * r / (float)floorRings;
+                for (int s = 0; s <= FloorSectors; s++)
+                {
+                    float a = s / (float)FloorSectors * Mathf.PI * 2f;
+                    var point = new Vector3(Mathf.Cos(a) * ringRadius, 0f, Mathf.Sin(a) * ringRadius);
+                    floorVertices.Add(point);
+                    floorColors.Add(FloorTint(point.x, point.z));
+                }
+            }
+            var floorTriangles = new List<int>(floorRings * FloorSectors * 6);
+            for (int s = 0; s < FloorSectors; s++)
+                floorTriangles.AddRange(new[] { 0, FloorRingIndex(s + 1, 1), FloorRingIndex(s, 1) });
+            for (int r = 1; r < floorRings; r++)
+            for (int s = 0; s < FloorSectors; s++)
+            {
+                int inner = FloorRingIndex(s, r), innerNext = FloorRingIndex(s + 1, r);
+                int outer = FloorRingIndex(s, r + 1), outerNext = FloorRingIndex(s + 1, r + 1);
+                floorTriangles.AddRange(new[] { inner, innerNext, outerNext, inner, outerNext, outer });
+            }
+            var groundMesh = new Mesh
+            {
+                vertices = floorVertices.ToArray(),
+                colors = floorColors.ToArray(),
+                triangles = floorTriangles.ToArray()
+            };
+            groundMesh.RecalculateNormals();
+            groundMesh.RecalculateBounds();
+            ground.AddComponent<MeshFilter>().sharedMesh = groundMesh;
             var groundCollider = ground.AddComponent<MeshCollider>();
             groundCollider.sharedMesh = groundMesh;
-            ground.GetComponent<MeshRenderer>().sharedMaterial = rock;
+            ground.AddComponent<MeshRenderer>().sharedMaterial = rock;
 
             spawnMarker = new GameObject(MistyPillarsVistaBuilder.SpawnMarkerName).transform;
             spawnMarker.SetParent(root.transform, false);
@@ -173,6 +199,16 @@ namespace GoatDescent.ProceduralWorld
             GameObject found = GameObject.Find(MistyPillarsVistaBuilder.SpawnMarkerName);
             if (found) spawnMarker = found.transform;
             return spawnMarker;
+        }
+
+        private static int FloorRingIndex(int sector, int ring) => 1 + (ring - 1) * (FloorSectors + 1) + sector;
+
+        private static Color FloorTint(float x, float z)
+        {
+            float broad = Mathf.PerlinNoise(x * .006f + 3.7f, z * .006f + 9.1f);
+            float fine = Mathf.PerlinNoise(x * .028f + 17.3f, z * .028f + 4.4f);
+            float grass = Mathf.Lerp(.42f, .95f, broad * .75f + fine * .25f);
+            return new Color(1f, grass, 0f, 0f);
         }
 
         private static Material MakePlainMaterial(Color color)

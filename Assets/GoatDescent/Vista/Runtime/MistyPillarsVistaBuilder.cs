@@ -104,6 +104,19 @@ namespace GoatDescent.ProceduralWorld
                 Vector3 offset = new Vector3(Mathf.Cos(a) * spec.rx * .62f, -4f, Mathf.Sin(a) * spec.rz * .62f);
                 AddRock(stone, offset, spec.height * Next(random, .46f, .82f), spec.rx * Next(random, .22f, .4f), spec.rz * Next(random, .24f, .44f), spec.seed + i * 71, KindClassic, spec.terraceBoost, 28, 30);
             }
+            if (spec.detail < 3)
+            {
+                float avgRadius = (spec.rx + spec.rz) * .5f;
+                int boulders = 9 + (spec.seed & 3);
+                for (int i = 0; i < boulders; i++)
+                {
+                    float a = i * 2.399963f + Noise(i * .7f, 1.3f, spec.seed) * 1.1f;
+                    float dist = Next(random, 1.02f, 1.3f);
+                    AddRock(stone,
+                        new Vector3(Mathf.Cos(a) * avgRadius * dist, Next(random, -2.5f, .5f), Mathf.Sin(a) * avgRadius * dist),
+                        Next(random, 3f, 9f), Next(random, 2.2f, 5.5f), Next(random, 2.2f, 5.5f), spec.seed * 7 + i * 13, KindClassic, 0f, 12, 8);
+                }
+            }
             if (spec.neutralRockColors)
                 for (int i = 0; i < stone.colors.Count; i++) stone.colors[i] = new Color(0f, 0f, 0f, 0f);
             var stoneObject = sink.Emit(tower.transform, RockObjectName, "Cliff_" + spec.seed, stone, rock, true);
@@ -133,17 +146,72 @@ namespace GoatDescent.ProceduralWorld
                 leaves.AddCrown(new Vector3(x, y + 1f, z), new Vector3(undergrowth * 1.5f, undergrowth * .7f, undergrowth), spec.seed + i, CanopyTint(random), 9, 6);
             }
 
+            float SummitRise(float ct) => Mathf.SmoothStep(.1f, .5f, ct) * (1f - ct * ct * .8f) * .85f;
+            float summitDomeHeight = Mathf.Clamp(Mathf.Min(spec.rx, spec.rz) * .42f, 14f, 26f);
+            Color summitTint = new Color(.34f, .48f, .22f, 1f);
+            int summitTufts = spec.detail > 1 ? 36 : 70;
+            for (int i = 0; i < summitTufts; i++)
+            {
+                float a = i * 2.399963f + spec.seed * .61f;
+                float ct = Mathf.Lerp(.18f, .8f, Mathf.Sqrt((i + .5f) / summitTufts));
+                float x = topLean.x + Mathf.Cos(a) * spec.rx * ct;
+                float z = topLean.y + Mathf.Sin(a) * spec.rz * ct;
+                float tuft = Next(random, 3f, 7.5f);
+                leaves.AddCrown(
+                    new Vector3(x, spec.height + summitDomeHeight * SummitRise(ct) + Noise(x * .06f, z * .06f, spec.seed) * 1.2f, z),
+                    new Vector3(tuft, tuft * .6f, tuft), spec.seed + 991 + i, summitTint, 9, 5);
+            }
+            if (clearingRadius > 0f)
+            {
+                for (int i = 0; i < 10; i++)
+                {
+                    float a = i * 2.399963f + spec.seed;
+                    float dist = Mathf.Lerp(clearingRadius * .5f, clearingRadius * .92f, (i % 5) / 4f);
+                    float ct = dist / Mathf.Max(1f, (spec.rx + spec.rz) * .5f);
+                    float x = clearingCenter.x + Mathf.Cos(a) * dist;
+                    float z = clearingCenter.y + Mathf.Sin(a) * dist;
+                    float tuft = Next(random, 3.5f, 7f);
+                    leaves.AddCrown(
+                        new Vector3(x, spec.height + summitDomeHeight * SummitRise(ct) + Noise(x * .06f, z * .06f, spec.seed) * 1.5f, z),
+                        new Vector3(tuft * 1.3f, tuft * .6f, tuft), spec.seed + 77 + i, CanopyTint(random), 9, 5);
+                }
+                for (int i = 0; i < 5; i++)
+                {
+                    float a = i * 1.2566371f + spec.seed * .37f;
+                    float dist = clearingRadius * Next(random, .6f, .92f);
+                    float ct = dist / Mathf.Max(1f, (spec.rx + spec.rz) * .5f);
+                    float x = clearingCenter.x + Mathf.Cos(a) * dist;
+                    float z = clearingCenter.y + Mathf.Sin(a) * dist;
+                    AddTree(leaves, wood, new Vector3(x, spec.height + summitDomeHeight * SummitRise(ct) + Noise(x * .05f, z * .05f, spec.seed) * 2f, z),
+                        Next(random, 10f, 18f), random, false);
+                }
+            }
+            if (spec.detail < 3)
+            {
+                float avgRadius = (spec.rx + spec.rz) * .5f;
+                for (int i = 0; i < 6; i++)
+                {
+                    float a = Next(random, 0f, Mathf.PI * 2f);
+                    float dist = Next(random, 1.04f, 1.32f);
+                    leaves.AddCrown(
+                        new Vector3(Mathf.Cos(a) * avgRadius * dist, Next(random, .5f, 2.5f), Mathf.Sin(a) * avgRadius * dist),
+                        new Vector3(Next(random, 4f, 8f), Next(random, 1.2f, 2.2f), Next(random, 4f, 8f)),
+                        spec.seed * 3 + i, CanopyTint(random) * .92f, 10, 5);
+                }
+            }
+
             int shrubs = Mathf.Max(6, Mathf.RoundToInt((spec.detail > 1 ? 35 : 135) * shrubFactor));
             for (int i = 0; i < shrubs; i++)
             {
                 float t = Next(random, .25f, .99f), angle = Next(random, 0f, Mathf.PI * 2f);
                 Vector3 p = RockPoint(t, angle, spec.height, spec.rx, spec.rz, spec.seed, kind, spec.terraceBoost);
-                p.x *= .965f; p.z *= .965f;
-                float size = Next(random, 1.8f, 3.8f) * Mathf.Lerp(.7f, 1.4f, t);
-                for (int lobe = 0; lobe < 4; lobe++)
+                p.x *= .94f; p.z *= .94f;
+                float size = Next(random, 1.5f, 3.2f) * Mathf.Lerp(.7f, 1.4f, t);
+                Color tint = CanopyTint(random);
+                for (int lobe = 0; lobe < 6; lobe++)
                 {
-                    Vector3 offset = new Vector3(Next(random, -size, size), Next(random, -size * .6f, size * .6f), Next(random, -size, size));
-                    leaves.AddCrown(p + offset, new Vector3(size, size * .85f, size), spec.seed + i * 7 + lobe, CanopyTint(random), 8, 5);
+                    Vector3 offset = new Vector3(Next(random, -size, size) * .8f, Next(random, -size * .7f, size * .35f), Next(random, -size, size) * .8f);
+                    leaves.AddCrown(p + offset, new Vector3(size, size * .6f, size), spec.seed + i * 7 + lobe, tint, 8, 5);
                 }
             }
 
@@ -154,13 +222,14 @@ namespace GoatDescent.ProceduralWorld
                 float t = Next(random, .64f, 1f);
                 float angle = fissure * 1.256637f + spec.seed * .41f + Mathf.Sin(t * 12f + fissure) * .13f + Next(random, -.22f, .22f);
                 Vector3 p = RockPoint(t, angle, spec.height, spec.rx, spec.rz, spec.seed, kind, spec.terraceBoost);
-                p.x *= .975f; p.z *= .975f;
-                float size = Next(random, 3f, 6.2f) * Mathf.Lerp(.7f, 1.2f, (t - .64f) / .36f);
-                Color tint = CanopyTint(random);
+                p.x *= .96f; p.z *= .96f;
+                float size = Next(random, 2.6f, 5f) * Mathf.Lerp(.7f, 1.2f, (t - .64f) / .36f);
+                Color tint = CanopyTint(random) * Mathf.Lerp(.74f, 1f, (t - .64f) / .36f);
+                tint.a = 1f;
                 for (int lobe = 0; lobe < 3; lobe++)
                 {
-                    Vector3 offset = new Vector3(Next(random, -size, size), Next(random, -size, size), Next(random, -size, size));
-                    leaves.AddCrown(p + offset, new Vector3(size, size * .82f, size * .9f), spec.seed * 43 + i * 5 + lobe, tint, 8, 5);
+                    Vector3 offset = new Vector3(Next(random, -size, size), Next(random, -size, size * .4f), Next(random, -size, size));
+                    leaves.AddCrown(p + offset, new Vector3(size, size * .7f, size * .9f), spec.seed * 43 + i * 5 + lobe, tint, 8, 5);
                 }
             }
 
@@ -192,7 +261,12 @@ namespace GoatDescent.ProceduralWorld
             return marker;
         }
 
-        private static Color CanopyTint(System.Random random) { float f = Next(random, .68f, 1.25f); return new Color(.48f * f, .65f * f, .31f * f, 1f); }
+        private static Color CanopyTint(System.Random random)
+        {
+            float f = Next(random, .82f, 1.1f);
+            float warm = Next(random, -.06f, .08f);
+            return new Color(Mathf.Clamp01(.48f * f + warm), Mathf.Clamp01(.65f * f), Mathf.Clamp01(.31f * f - warm * .5f), 1f);
+        }
 
         private static void AddTree(PillarMeshBuilder leaves, PillarMeshBuilder wood, Vector3 origin, float height, System.Random random, bool distant)
         {
@@ -226,8 +300,32 @@ namespace GoatDescent.ProceduralWorld
                 int a = first + r * (sides + 1) + s, b = a + 1, c = a + sides + 1, d = c + 1;
                 builder.Triangle(a, c, b); builder.Triangle(b, c, d);
             }
-            int top = builder.AddVertex(origin + new Vector3(0f, height + 7f, 0f), new Color(.9f, 1f, .5f, 1f));
-            for (int s = 0; s < sides; s++) builder.Triangle(top, first + rings * (sides + 1) + s + 1, first + rings * (sides + 1) + s);
+            int baseRing = first + rings * (sides + 1);
+            float domeHeight = Mathf.Clamp(Mathf.Min(rx, rz) * .42f, 14f, 26f);
+            int prevRing = baseRing;
+            for (int cr = 1; cr <= 5; cr++)
+            {
+                float ct = cr / 6f;
+                int ring = builder.vertices.Count;
+                for (int s = 0; s <= sides; s++)
+                {
+                    float a = s / (float)sides * Mathf.PI * 2f;
+                    float shrink = 1f - ct;
+                    float lobe = Noise(a * 1.35f + ct * 2.2f, ct * 3.1f - seed * .13f, seed);
+                    float rise = Mathf.SmoothStep(.1f, .5f, ct) * (1f - ct * ct * .8f) * (1f + .7f * lobe);
+                    float dome = domeHeight * rise + Noise(a * 3.4f + ct * 5f, ct * 3.7f, seed) * 1.4f;
+                    builder.AddVertex(origin + new Vector3(Mathf.Cos(a) * rx * shrink * (1f + .12f * lobe), height + dome, Mathf.Sin(a) * rz * shrink * (1f + .12f * lobe)),
+                        new Color(.5f + .45f * Noise(a * 2.7f + ct * 4.1f, ct * 3.3f, seed + 5), .8f, .5f, 1f));
+                }
+                for (int s = 0; s < sides; s++)
+                {
+                    int a0 = prevRing + s, b0 = prevRing + s + 1, a1 = ring + s, b1 = ring + s + 1;
+                    builder.Triangle(a0, a1, b0); builder.Triangle(b0, a1, b1);
+                }
+                prevRing = ring;
+            }
+            int apex = builder.AddVertex(origin + new Vector3(0f, height + domeHeight * .18f, 0f), new Color(.7f, .8f, .5f, 1f));
+            for (int s = 0; s < sides; s++) builder.Triangle(apex, prevRing + s + 1, prevRing + s);
         }
 
         public static float Noise(float x, float y, int seed) => Mathf.PerlinNoise(x + seed * 3.71f, y + seed * 1.13f) * 2f - 1f;
