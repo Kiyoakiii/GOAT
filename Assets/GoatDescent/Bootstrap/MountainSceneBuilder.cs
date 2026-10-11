@@ -23,15 +23,6 @@ namespace GoatDescent
             MountainDecor.Generate(root.transform, settings);
             MountainRouteProps.Generate(root.transform, settings);
 
-            var lightObject = new GameObject("Sun");
-            var light = lightObject.AddComponent<Light>();
-            light.type = LightType.Directional;
-            light.intensity = 1.2f;
-            light.color = new Color(1f, .96f, .86f);
-            light.shadows = LightShadows.Soft;
-            light.shadowStrength = .85f;
-            lightObject.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
-
             var cameraObject = Camera.main ? Camera.main.gameObject : null;
             if (!cameraObject)
             {
@@ -57,12 +48,13 @@ namespace GoatDescent
             var follow = Camera.main.GetComponent<ThirdPersonGoatCamera>();
             gameObject.AddComponent<LocalGoatPair>().Configure(first, second, follow,
                 spawn, yaw, null);
+            ApplyPost(settings);
             if (route != null && route.Count > 0)
             {
                 var hazardObject = new GameObject("Goat interaction hazards");
                 hazardObject.transform.SetParent(root.transform, false);
                 hazardObject.AddComponent<MountainHazardDirector>().Initialize(route,
-                    MountainMaterial.Get(), root.transform.Find("Route Markers and Hazards"));
+                    MountainMaterial.Get(settings), root.transform.Find("Route Markers and Hazards"));
                 Vector3 birdCenter = route[Mathf.Min(3, route.Count - 1)].Center;
                 Vector3 birdOutward = Vector3.ProjectOnPlane(birdCenter, Vector3.up).normalized;
                 var flock = new GameObject("Five mountain eagles");
@@ -84,18 +76,44 @@ namespace GoatDescent
         {
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogDensity = 0.25f / Mathf.Max(1f, settings.Radius);
-            RenderSettings.fogColor = new Color(.78f, .85f, .91f);
+            RenderSettings.fogDensity = 0.25f * Mathf.Max(0f, settings.FogStrength) / Mathf.Max(1f, settings.Radius);
+            RenderSettings.fogColor = settings.FogColor;
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(.7f, .73f, .76f);
+            RenderSettings.ambientLight = settings.AmbientColor;
 
             var sky = new Material(Shader.Find("GoatDescent/Sky"));
-            sky.SetColor("_SkyZenith", new Color(.22f, .42f, .72f));
-            sky.SetColor("_SkyHorizon", new Color(.75f, .88f, .95f));
+            sky.SetColor("_SkyZenith", settings.SkyZenith);
+            sky.SetColor("_SkyHorizon", settings.SkyHorizon);
             sky.SetColor("_GroundColor", new Color(.5f, .56f, .6f));
-            sky.SetColor("_SunColor", new Color(1f, .94f, .78f));
+            sky.SetColor("_SunColor", settings.SunColor);
             sky.SetVector("_SunDir", new Vector4(.5f, .72f, -.35f, 0f));
             RenderSettings.skybox = sky;
+
+            ApplySun(settings);
+            ApplyPost(settings);
+        }
+
+        private static void ApplySun(MountainSettings settings)
+        {
+            var light = Object.FindFirstObjectByType<Light>();
+            if (!light || light.type != LightType.Directional)
+            {
+                var sunObject = new GameObject("Sun");
+                light = sunObject.AddComponent<Light>();
+                light.type = LightType.Directional;
+                light.shadows = LightShadows.Soft;
+                light.shadowStrength = .85f;
+                light.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+            }
+            light.intensity = settings.SunIntensity;
+            light.color = settings.SunColor;
+        }
+
+        private static void ApplyPost(MountainSettings settings)
+        {
+            var post = Object.FindFirstObjectByType<CinematicPostProcess>();
+            if (post) post.Apply(settings.Exposure, settings.Saturation, settings.Contrast,
+                settings.Warmth, settings.Vignette);
         }
 
         public void RebuildTerrain()
@@ -121,7 +139,7 @@ namespace GoatDescent
             var filter = surface.AddComponent<MeshFilter>();
             filter.sharedMesh = MountainGenerator.Build(settings);
             var renderer = surface.AddComponent<MeshRenderer>();
-            var material = MountainMaterial.Get();
+            var material = MountainMaterial.Get(settings);
             MountainMaterial.Configure(material, settings);
             renderer.sharedMaterial = material;
             var collider = surface.AddComponent<MeshCollider>();

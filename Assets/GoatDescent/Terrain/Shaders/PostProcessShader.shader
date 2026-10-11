@@ -7,6 +7,9 @@ Shader "GoatDescent/PostProcess"
         _Contrast ("Contrast", Range(0.5, 1.5)) = 1.1
         _Saturation ("Saturation", Range(0, 2)) = 1.15
         _Warmth ("Warmth", Range(0, 1)) = 0.25
+        _Vignette ("Vignette", Range(0, 1)) = 0.0
+        _ShadowTint ("Shadow Tint", Color) = (0.93, 0.97, 1.08, 1)
+        _HighlightTint ("Highlight Tint", Color) = (1.06, 1.0, 0.9, 1)
     }
     SubShader
     {
@@ -24,6 +27,9 @@ Shader "GoatDescent/PostProcess"
             float _Contrast;
             float _Saturation;
             float _Warmth;
+            float _Vignette;
+            fixed4 _ShadowTint;
+            fixed4 _HighlightTint;
 
             struct appdata
             {
@@ -58,8 +64,14 @@ Shader "GoatDescent/PostProcess"
                 c = Sat(c, _Saturation);
                 c = (c - 0.5) * _Contrast + 0.5;
 
+                float luma = dot(c, fixed3(0.299, 0.587, 0.114));
+                c *= lerp(_ShadowTint.rgb, _HighlightTint.rgb, smoothstep(0.1, 0.75, luma));
+
                 c.r += _Warmth * 0.05;
                 c.b -= _Warmth * 0.04;
+
+                float2 fromCenter = i.uv - 0.5;
+                c *= 1.0 - _Vignette * smoothstep(0.25, 0.9, dot(fromCenter, fromCenter) * 2.4);
 
                 return fixed4(c, 1.0);
             }

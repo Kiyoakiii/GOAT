@@ -95,6 +95,51 @@ namespace GoatDescent.EditorTools
             changed |= IntDrag("Сетка", ref settings.Grid, 64, 320);
 
             EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Стиль (внешний вид)", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Пресет задаёт туман, свет, небо, снежную шапку и мягкие низкораставые текстуры. " +
+                "Параметры ниже можно крутить поверх пресета.",
+                MessageType.None);
+            if (GUILayout.Button("Пресет: Valheim (мягкий, туманный)"))
+            {
+                settings.ApplyValheimStyle();
+                MountainMaterial.ResetCache();
+                changed = true;
+            }
+            if (GUILayout.Button("Пресет: Базовый (как было)"))
+            {
+                settings.ApplyClassicStyle();
+                MountainMaterial.ResetCache();
+                changed = true;
+            }
+            changed |= ColorDrag("Цвет тумана", ref settings.FogColor);
+            changed |= Drag("Плотность тумана", ref settings.FogStrength, 0f, 4f);
+            changed |= ColorDrag("Цвет солнца", ref settings.SunColor);
+            changed |= Drag("Яркость солнца", ref settings.SunIntensity, 0.4f, 2f);
+            changed |= ColorDrag("Подсветка теней", ref settings.AmbientColor);
+            changed |= ColorDrag("Небо (зенит)", ref settings.SkyZenith);
+            changed |= ColorDrag("Небо (горизонт)", ref settings.SkyHorizon);
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Стиль поверхностей", EditorStyles.boldLabel);
+            int textureSizeBefore = settings.TextureSize;
+            changed |= IntDrag("Размер текстур (0 — оригинал)", ref settings.TextureSize, 0, 256);
+            if (settings.TextureSize != textureSizeBefore) MountainMaterial.ResetCache();
+            changed |= Drag("Начало снега", ref settings.SnowStart, 0.3f, 1f);
+            changed |= Drag("Мягкость снега", ref settings.SnowFade, 0.02f, 0.3f);
+            changed |= Drag("Трава ниже высоты", ref settings.GrassEnd, 0f, 0.9f);
+            changed |= Drag("Порог крутизны", ref settings.Steepness, 0f, 1f);
+            changed |= Drag("Замощение текстур", ref settings.Tiling, 0.005f, 0.08f);
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Стиль картинки (постобработка)", EditorStyles.boldLabel);
+            changed |= Drag("Экспозиция", ref settings.Exposure, 0.6f, 1.6f);
+            changed |= Drag("Насыщенность", ref settings.Saturation, 0f, 2f);
+            changed |= Drag("Контраст", ref settings.Contrast, 0.5f, 1.5f);
+            changed |= Drag("Тепло", ref settings.Warmth, 0f, 1f);
+            changed |= Drag("Виньетка", ref settings.Vignette, 0f, 1f);
+
+            EditorGUILayout.Space();
             if (GUILayout.Button("Случайная гора"))
             {
                 settings.Seed = Random.Range(0, 100000);
@@ -181,6 +226,15 @@ namespace GoatDescent.EditorTools
             return false;
         }
 
+        private static bool ColorDrag(string label, ref Color value)
+        {
+            Color v = EditorGUILayout.ColorField(new GUIContent(label), value);
+            float delta = Mathf.Abs(v.r - value.r) + Mathf.Abs(v.g - value.g)
+                + Mathf.Abs(v.b - value.b) + Mathf.Abs(v.a - value.a);
+            if (delta > 1e-5f) { value = v; return true; }
+            return false;
+        }
+
         private void RebuildPreview()
         {
             var builder = Object.FindFirstObjectByType<MountainSceneBuilder>();
@@ -206,7 +260,7 @@ namespace GoatDescent.EditorTools
             surface.transform.SetParent(previewRoot.transform, false);
             var filter = surface.AddComponent<MeshFilter>();
             filter.sharedMesh = MountainGenerator.Build(settings);
-            var material = MountainMaterial.Get();
+            var material = MountainMaterial.Get(settings);
             MountainMaterial.Configure(material, settings);
             surface.AddComponent<MeshRenderer>().sharedMaterial = material;
 
