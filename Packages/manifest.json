@@ -16,6 +16,8 @@
     "com.unity.modules.unitywebrequest": "1.0.0",
     "com.unity.modules.unitywebrequesttexture": "1.0.0",
     "com.unity.modules.unitywebrequestwww": "1.0.0",
-    "com.unity.modules.video": "1.0.0"
+    "com.unity.modules.video": "1.0.0",
+    "com.unity.pipeline": "0.8.0-exp.1",
+    "com.unity.project-auditor": "1.0.2"
   }
 }

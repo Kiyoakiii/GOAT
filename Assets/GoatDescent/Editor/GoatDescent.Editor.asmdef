@@ -1,0 +1,25 @@
+{
+    "name": "GoatDescent.Editor",
+    "rootNamespace": "GoatDescent.EditorTools",
+    "references": [
+        "GoatDescent.Terrain",
+        "GoatDescent.Player",
+        "GoatDescent.Route",
+        "GoatDescent.Decor",
+        "GoatDescent.Bootstrap",
+        "GoatDescent.ProceduralWorld.Runtime",
+        "GoatDescent.ProceduralWorld.Editor",
+        "Unity.ProjectAuditor.Editor"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
