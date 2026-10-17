@@ -19,6 +19,7 @@ namespace GoatDescent
         { if (!MountainAuthority.IsHost) { IsDead = dead; HasCheckpoint = hasCheckpoint; } }
         public void Configure(Rigidbody targetBody, Vector3 targetSpawn, RouteProgressTracker progress = null)
         { body = targetBody; spawn = summitSpawn = targetSpawn; routeProgress = progress; }
+        public void SetKillPlane(float height) => killPlane = height;
         public void SetCheckpoint(Vector3 point) { spawn = point; HasCheckpoint = true; }
         private void Awake()
         {

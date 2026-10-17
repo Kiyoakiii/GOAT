@@ -27,6 +27,7 @@ namespace GoatDescent
         public void NetworkSpaceDown() => remoteSpaceDown = true;
         public void NetworkSpaceUp() => remoteSpaceUp = true;
 
+        public float ChargedJumpVelocity => jumpVelocity + chargedVerticalBonus;
         public bool IsCharging { get; private set; }
         public float Charge01 => IsCharging ? Mathf.Clamp01((Time.time - chargeStarted) / fullChargeSeconds) : 0f;
         private bool HasFooting => ground && ground.IsGrounded && ground.SlopeAngle < 80f;

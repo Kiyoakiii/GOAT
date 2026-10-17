@@ -1,0 +1,8 @@
+{
+    "name": "GoatDescent.Level",
+    "rootNamespace": "GoatDescent.Levels",
+    "references": [
+        "GoatDescent.Terrain",
+        "GoatDescent.Decor"
+    ]
+}

@@ -1,4 +1,6 @@
+using GoatDescent.Levels;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace GoatDescent.EditorTools
@@ -36,6 +38,7 @@ namespace GoatDescent.EditorTools
 
         private void OnGUI()
         {
+            if (DrawLevelRecipe()) return;
             EditorGUILayout.LabelField("Генератор горы", EditorStyles.boldLabel);
             EditorGUILayout.Space();
 
@@ -166,6 +169,47 @@ namespace GoatDescent.EditorTools
                 ScheduleRebuild();
             }
             EditorGUILayout.EndScrollView();
+        }
+
+        private bool DrawLevelRecipe()
+        {
+            var builder = Object.FindFirstObjectByType<MountainSceneBuilder>();
+            var current = builder ? builder.LevelRecipe : null;
+            var selected = (LevelRecipe)EditorGUILayout.ObjectField("Рецепт уровня", current, typeof(LevelRecipe), false);
+            if (builder && selected != current && !Application.isPlaying)
+            {
+                builder.ClearBuilt();
+                Undo.RecordObject(builder, "Выбор рецепта уровня");
+                builder.SetLevelRecipe(selected);
+                EditorSceneManager.MarkSceneDirty(builder.gameObject.scene);
+            }
+            if (!selected) return false;
+            if (!builder)
+            {
+                EditorGUILayout.HelpBox("Откройте GoatPlayground для генерации уровня.", MessageType.Info);
+                return true;
+            }
+            EditorGUILayout.LabelField(selected.LevelName, EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox("Каркас задаёт порядок испытаний. Сейчас доступна Каменная корона; остальные формы запланированы. " +
+                "Целевая длительность требует проверки прохождением.", MessageType.Info);
+            scrollPos = EditorGUILayout.BeginScrollView(scrollPos);
+            using (new EditorGUI.DisabledScope(Application.isPlaying))
+            {
+                var serialized = new SerializedObject(selected);
+                var property = serialized.GetIterator();
+                bool enter = true;
+                while (property.NextVisible(enter))
+                {
+                    enter = false;
+                    if (property.name != "m_Script") EditorGUILayout.PropertyField(property, true);
+                }
+                serialized.ApplyModifiedProperties();
+                if (GUILayout.Button("Собрать превью уровня")) builder.RebuildTerrain();
+                if (GUILayout.Button("Убрать превью")) builder.ClearBuilt();
+                if (GUILayout.Button("Проверить маршрут и геометрию")) CrownLevelCI.Check();
+            }
+            EditorGUILayout.EndScrollView();
+            return true;
         }
 
         private static MountainSettings LoadOrCreate()

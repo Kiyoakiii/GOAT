@@ -1,3 +1,4 @@
+using GoatDescent.Levels;
 using UnityEngine;
 
 namespace GoatDescent
@@ -5,6 +6,9 @@ namespace GoatDescent
     public sealed class MountainSceneBuilder : MonoBehaviour
     {
         public MountainSettings settings = new MountainSettings();
+        [SerializeField] private LevelRecipe levelRecipe;
+        public LevelRecipe LevelRecipe => levelRecipe;
+        public void SetLevelRecipe(LevelRecipe value) => levelRecipe = value;
 
         private void Start()
         {
@@ -14,6 +18,11 @@ namespace GoatDescent
 
         public void BuildWorld()
         {
+            if (levelRecipe)
+            {
+                CrownLevelBuilder.Generate(this, levelRecipe, true);
+                return;
+            }
             ClearBuilt();
             SetupEnvironment(settings);
 
@@ -118,6 +127,16 @@ namespace GoatDescent
 
         public void RebuildTerrain()
         {
+            if (levelRecipe)
+            {
+                if (Application.isPlaying)
+                {
+                    Debug.LogWarning("Остановите Play Mode перед пересборкой маршрута уровня.", this);
+                    return;
+                }
+                CrownLevelBuilder.Generate(this, levelRecipe, false);
+                return;
+            }
             SetupEnvironment(settings);
             var root = transform.Find("Procedural Mountain");
             if (!root)
@@ -149,6 +168,11 @@ namespace GoatDescent
 
         public void ClearBuilt()
         {
+            if (levelRecipe)
+            {
+                CrownLevelBuilder.Clear(this);
+                return;
+            }
             for (int i = transform.childCount - 1; i >= 0; i--)
                 DestroyImmediate(transform.GetChild(i).gameObject);
             var sun = FindFirstObjectByType<Light>();

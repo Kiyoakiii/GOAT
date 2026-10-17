@@ -66,6 +66,7 @@ namespace GoatDescent
             : (Camera.main ? Camera.main.transform.right : Vector3.right);
 
         public Vector3 Velocity => !MountainAuthority.IsHost ? networkVelocity : body ? body.linearVelocity : Vector3.zero;
+        public float MaxGroundSpeed => maxGroundSpeed;
         public bool Grounded => ground && ground.IsGrounded;
         public Vector3 MoveDirection => moveDirection;
         public bool IsBracingForJump { get; set; }

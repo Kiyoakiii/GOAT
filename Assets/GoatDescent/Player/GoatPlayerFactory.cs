@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace GoatDescent
@@ -6,7 +7,8 @@ namespace GoatDescent
     public static class GoatPlayerFactory
     {
         public static GoatController Create(Vector3 spawn, float initialYaw = 0f,
-            bool checkpointRespawn = true, bool configureCamera = true)
+            bool checkpointRespawn = true, bool configureCamera = true,
+            IReadOnlyList<LandingPlatform> platforms = null, Material routeMaterial = null)
         {
             var goat = new GameObject("Mountain Goat");
             goat.transform.position = spawn;
@@ -38,7 +40,7 @@ namespace GoatDescent
             goat.AddComponent<GoatInteraction>();
             goat.AddComponent<GoatSpectacle>();
             var routeProgress = goat.AddComponent<RouteProgressTracker>();
-            routeProgress.Configure(MountainGenerator.CurrentRoute, MountainMaterial.Get(), spawn, checkpointRespawn);
+            routeProgress.Configure(platforms ?? MountainGenerator.CurrentRoute, routeMaterial ? routeMaterial : MountainMaterial.Get(), spawn, checkpointRespawn);
             goat.AddComponent<RespawnController>().Configure(body, spawn, routeProgress);
 
             var camera = Camera.main;

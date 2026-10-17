@@ -1,7 +1,13 @@
 {
     "name": "GoatDescent.Bootstrap",
     "rootNamespace": "GoatDescent",
-    "references": ["GoatDescent.Terrain", "GoatDescent.Player", "GoatDescent.Route", "GoatDescent.Decor"],
+    "references": [
+        "GoatDescent.Terrain",
+        "GoatDescent.Player",
+        "GoatDescent.Route",
+        "GoatDescent.Decor",
+        "GoatDescent.Level"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

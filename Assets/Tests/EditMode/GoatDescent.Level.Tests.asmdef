@@ -1,0 +1,16 @@
+{
+    "name": "GoatDescent.Level.Tests",
+    "references": [
+        "GoatDescent.Level",
+        "GoatDescent.Terrain"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ]
+}

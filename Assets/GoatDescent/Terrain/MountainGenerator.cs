@@ -9,6 +9,11 @@ namespace GoatDescent
 
         public static int MainRouteCount => RouteQueries.MainRouteCount;
 
+        public static void UseRoute(IReadOnlyList<LandingPlatform> route)
+        {
+            RouteQueries.SetRoute(route == null ? null : new List<LandingPlatform>(route));
+        }
+
         public static void PrepareRoute(MountainSettings s)
         {
             var route = MountainRoute.Generate(s);

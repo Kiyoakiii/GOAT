@@ -1,7 +1,10 @@
 {
     "name": "GoatDescent.Player",
     "rootNamespace": "GoatDescent",
-    "references": ["GoatDescent.Terrain"],
+    "references": [
+        "GoatDescent.Terrain",
+        "GoatDescent.Level"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace GoatDescent
@@ -16,18 +17,19 @@ namespace GoatDescent
         private ThirdPersonGoatCamera follow;
         private Vector3 origin, forward, side;
         private float yaw;
+        private IReadOnlyList<LandingPlatform> activeRoute;
 
         private void Awake() => Instance = this;
         private void OnDestroy() { if (Instance == this) Instance = null; }
 
         public void Configure(GoatController a, GoatController b, ThirdPersonGoatCamera camera,
-            Vector3 summit, float initialYaw, Transform unusedPillar)
+            Vector3 summit, float initialYaw, Transform unusedPillar, IReadOnlyList<LandingPlatform> platforms = null)
         {
             Primary = a;
             Secondary = b;
             follow = camera;
             origin = summit;
-            var route = MountainGenerator.CurrentRoute;
+            var route = activeRoute = platforms ?? MountainGenerator.CurrentRoute;
             forward = route != null && route.Count > 1
                 ? Vector3.ProjectOnPlane(route[1].Center - route[0].Center, Vector3.up).normalized
                 : Quaternion.Euler(0f, initialYaw, 0f) * Vector3.forward;
@@ -123,7 +125,7 @@ namespace GoatDescent
 
         public void ResetFragilePractice()
         {
-            var route = MountainGenerator.CurrentRoute;
+            var route = activeRoute;
             if (route == null) return;
             for (int i = 0; i < route.Count; i++)
             {
@@ -138,7 +140,7 @@ namespace GoatDescent
 
         public void ResetRockPractice()
         {
-            var route = MountainGenerator.CurrentRoute;
+            var route = activeRoute;
             if (route == null || route.Count < 5) return;
             ScenarioCode = 11;
             Scenario = "F11: камень катится с верхнего выступа к нижнему";

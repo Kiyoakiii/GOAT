@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace GoatDescent
@@ -10,12 +11,12 @@ namespace GoatDescent
         private SkyPredatorEpisode eagles;
         public string MapSignature { get; private set; }
 
-        public void Initialize()
+        public void Initialize(string levelSignature = null, IReadOnlyList<LandingPlatform> levelRoute = null)
         {
             platforms = FindObjectsByType<CrumblingPlatform>(FindObjectsSortMode.None);
             hazards = MountainHazardDirector.Current;
             eagles = SkyPredatorEpisode.Current;
-            var route = MountainGenerator.CurrentRoute;
+            var route = levelRoute ?? MountainGenerator.CurrentRoute;
             uint hash = 2166136261u;
             if (route != null)
             {
@@ -27,7 +28,7 @@ namespace GoatDescent
                     hash = Fold(hash, (int)point.Type);
                 }
             }
-            MapSignature = (route?.Count ?? 0) + ":" + hash.ToString("X8");
+            MapSignature = levelSignature ?? ((route?.Count ?? 0) + ":" + hash.ToString("X8"));
         }
 
         private static uint Fold(uint hash, int value)

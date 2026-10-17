@@ -1,0 +1,53 @@
+{
+  "scene": "Assets/GoatDescent/Scenes/GoatPlayground.unity",
+  "scenarios": [
+    {
+      "id": "summit_walk",
+      "seed": 7,
+      "timeout": 30,
+      "commands": [
+        { "type": "wait", "seconds": 0.6 },
+        { "type": "walk", "x": 0, "y": 0, "z": 1, "seconds": 0.35 },
+        { "type": "stop", "seconds": 0.5 }
+      ],
+      "checks": [
+        { "type": "alive", "op": ">=", "value": 1 },
+        { "type": "grounded", "op": ">=", "value": 1 },
+        { "type": "max_speed", "op": ">=", "value": 0.5 },
+        { "type": "fell", "op": "==", "value": 0 }
+      ]
+    },
+    {
+      "id": "summit_jump",
+      "seed": 7,
+      "timeout": 30,
+      "commands": [
+        { "type": "wait", "seconds": 0.6 },
+        { "type": "walk", "x": 0, "y": 0, "z": 1, "seconds": 0.2 },
+        { "type": "jump", "seconds": 0.25 },
+        { "type": "stop", "seconds": 1.6 }
+      ],
+      "checks": [
+        { "type": "airborne", "op": ">=", "value": 1 },
+        { "type": "alive", "op": ">=", "value": 1 },
+        { "type": "fell", "op": "==", "value": 0 }
+      ]
+    },
+    {
+      "id": "summit_walk_repeat",
+      "seed": 7,
+      "timeout": 30,
+      "tolerance": 0.25,
+      "repeat": true,
+      "commands": [
+        { "type": "wait", "seconds": 0.6 },
+        { "type": "walk", "x": 0, "y": 0, "z": 1, "seconds": 0.35 },
+        { "type": "stop", "seconds": 0.5 }
+      ],
+      "checks": [
+        { "type": "alive", "op": ">=", "value": 1 },
+        { "type": "max_speed", "op": ">=", "value": 0.5 }
+      ]
+    }
+  ]
+}
