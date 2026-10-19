@@ -29,10 +29,34 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Layers: 0.27
-    - _Tiling: 0.035
+    - _Contact: 0.42
+    - _DepthFloor: -180
+    - _DepthShade: 0.34
+    - _DepthSpan: 205
+    - _Dust: 0.52
+    - _HazeDesat: 0.22
+    - _HazeEnd: 2200
+    - _HazeStart: 600
+    - _HazeStrength: 0.38
+    - _Jitter: 7.5
+    - _Layers: 0.26
+    - _Mid: 0.6
+    - _Playa: 0.6
+    - _PlayaSpan: 36
+    - _PlayaY: -100
+    - _Shear: 0.035
+    - _StrataScale: 0.072
+    - _Tiling: 0.16
+    - _Varnish: 0.26
     m_Colors:
-    - _RockTint: {r: 1.62, g: 0.99, b: 0.57, a: 1}
-    - _SandTint: {r: 1.45, g: 1.08, b: 0.67, a: 1}
+    - _HazeTint: {r: 0.84, g: 0.64, b: 0.48, a: 1}
+    - _MidTint: {r: 1, g: 0.64, b: 0.45, a: 1}
+    - _PlayaTint: {r: 1, g: 0.89, b: 0.76, a: 1}
+    - _RockTint: {r: 1.14, g: 0.72, b: 0.44, a: 1}
+    - _SandTint: {r: 1, g: 0.76, b: 0.53, a: 1}
+    - _SeamTint: {r: 0.46, g: 0.24, b: 0.15, a: 1}
+    - _ShadeTint: {r: 0.55, g: 0.36, b: 0.29, a: 1}
+    - _Swirl: {r: 1.9, g: -41, b: 23, a: 7}
+    - _VarnishTint: {r: 0.28, g: 0.17, b: 0.11, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

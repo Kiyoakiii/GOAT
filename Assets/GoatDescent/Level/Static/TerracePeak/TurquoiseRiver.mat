@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: TurquoiseRiver
+  m_Shader: {fileID: 4800000, guid: db45dec1a8e6b6a49af601b6e10d8156, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _Haze: 0.85
+    m_Colors:
+    - _Deep: {r: 0.06, g: 0.32, b: 0.42, a: 1}
+    - _Foam: {r: 0.72, g: 0.86, b: 0.86, a: 1}
+    - _HazeColor: {r: 0.8, g: 0.8, b: 0.75, a: 1}
+    - _Shallow: {r: 0.2, g: 0.64, b: 0.7, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

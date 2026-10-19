@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: GoatDescent/FrozenRiftRock
+  m_Name: ColdRock
   m_Shader: {fileID: 4800000, guid: af9cbb728c974794a864532358db2f09, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -29,10 +29,15 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Layers: 0.3
-    - _Tiling: 0.055
+    - _Depth: 0.3
+    - _Haze: 0.8
+    - _Layers: 0.62
+    - _StrataStep: 0.035
+    - _Tiling: 0.03
     m_Colors:
-    - _RockTint: {r: 0.88, g: 0.9, b: 0.95, a: 1}
-    - _SandTint: {r: 0.67, g: 0.77, b: 0.89, a: 1}
+    - _DeepTint: {r: 0.36, g: 0.47, b: 0.6, a: 1}
+    - _HazeColor: {r: 0.66, g: 0.8, b: 0.94, a: 1}
+    - _RockTint: {r: 1.92, g: 1.8, b: 1.62, a: 1}
+    - _SnowTint: {r: 0.9, g: 0.93, b: 0.97, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

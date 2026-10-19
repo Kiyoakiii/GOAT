@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: GoatDescent/FrozenRiftIce
+  m_Name: GlacierIce
   m_Shader: {fileID: 4800000, guid: d8ac53ff88402fe42a99ec69f29225aa, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -24,8 +24,16 @@ Material:
     serializedVersion: 3
     m_TexEnvs: []
     m_Ints: []
-    m_Floats: []
+    m_Floats:
+    - _Alpha: 0.78
+    - _Emissive: 0.42
+    - _Fresnel: 2.2
+    - _Gloss: 0.88
+    - _Haze: 0.7
     m_Colors:
-    - _Color: {r: 0.08, g: 0.55, b: 0.78, a: 1}
+    - _Color: {r: 0.5, g: 0.74, b: 0.96, a: 1}
+    - _CoreColor: {r: 0.22, g: 0.37, b: 0.55, a: 1}
+    - _EdgeColor: {r: 0.82, g: 0.96, b: 1, a: 1}
+    - _HazeColor: {r: 0.66, g: 0.8, b: 0.94, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
