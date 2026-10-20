@@ -25,6 +25,7 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
+    - _DistanceScale: 5
     - _Strength: 0.5
     m_Colors:
     - _HazeColor: {r: 0.96, g: 0.89, b: 0.78, a: 1}

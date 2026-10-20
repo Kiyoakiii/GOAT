@@ -26,8 +26,8 @@ Material:
     m_Ints: []
     m_Floats:
     - _Contact: 0.7
-    - _Haze: 0.85
-    - _Tiling: 0.0055
+    - _Haze: 0
+    - _Tiling: 0.0011
     m_Colors:
     - _EarthTint: {r: 0.45, g: 0.4, b: 0.3, a: 1}
     - _GrassLight: {r: 0.53, g: 0.62, b: 0.4, a: 1}

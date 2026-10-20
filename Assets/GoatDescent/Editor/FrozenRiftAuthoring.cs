@@ -11,11 +11,14 @@ namespace GoatDescent.EditorTools
     {
         private const string Folder = "Assets/GoatDescent/Level/Static/FrozenRift";
         private const string Scene = "Assets/GoatDescent/Scenes/FrozenRift.unity";
+        private const float WorldScale = 5f;
+        private const float TrailStep = 4f;
 
         private static Material rock, bed, ridgeRock, snow, ridgeSnow, ice, needles, wood, mist;
         private static Mesh spike, shard, block, cluster, boulder, needleMesh, crownMesh, trunkMesh, mistMesh;
         private static Vector3 trailEnd;
         private static Vector3 viewEye;
+        private static int routeWaypoints, routeLength, routeJumps, routeCheckpoints;
 
         [MenuItem("Tools/GOAT/Статичные горы/Ледяной разлом — открыть")]
         public static void Open()
@@ -36,6 +39,9 @@ namespace GoatDescent.EditorTools
             bed = RockMaterial("GlacierBed", new Color(1.66f, 1.72f, 1.8f), new Color(.35f, .5f, .64f), .55f, .03f);
             ridgeRock = RidgeMaterial("FarRidgesRock", new Color(.78f, .84f, .93f), .55f);
             snow = SnowMaterial("Snow", new Color(.9f, .94f, .985f), .8f);
+            var padSnow = SnowMaterial("JumpPadSnow", new Color(.95f, .98f, 1.01f), .78f);
+            padSnow.SetColor("_ShadowTint", new Color(.58f, .72f, .92f));
+            padSnow.SetColor("_IceTint", new Color(.74f, .9f, 1f));
             ridgeSnow = RidgeMaterial("FarRidgesSnow", new Color(.88f, .93f, 1.03f), .62f);
             ice = IceMaterial();
             needles = PlainMaterial("FirNeedles", new Color(.1f, .15f, .11f), .06f);
@@ -117,13 +123,15 @@ namespace GoatDescent.EditorTools
             var jumpIce = new FrozenRiftBatch();
             JumpSpots(jumpSnow, jumpIce, random);
             Place(relief, "Прыжковые уступы и жёлобы тропы", Save(jumpSnow.Build("Снежные уступы тропы"), "TrailJumpsSnow.asset"),
-                snow, Vector3.zero, Vector3.one);
+                padSnow, Vector3.zero, Vector3.one);
             Place(iceRoot, "Ледяные мосты тропы", Save(jumpIce.Build("Ледяные мосты тропы"), "TrailBridgesIce.asset"),
                 ice, Vector3.zero, Vector3.one);
             MainDruse(iceRoot, trailEnd, random);
+            root.localPosition = Vector3.zero;
+            root.localScale = Vector3.one * WorldScale;
             Environment();
             var camera = new GameObject("Main Camera").AddComponent<Camera>(); camera.tag = "MainCamera";
-            camera.fieldOfView = 52f; camera.farClipPlane = 3400f;
+            camera.fieldOfView = 52f; camera.farClipPlane = 3400f * WorldScale;
             var post = camera.gameObject.AddComponent<GoatDescent.GoatScenePost>();
             post.coolTint = new Color(.93f, .985f, 1.06f);
             post.warmTint = Color.white;
@@ -148,12 +156,104 @@ namespace GoatDescent.EditorTools
             Render(camera, "FrozenRift-mountains");
             PlaceCamera(camera, new Vector3(-620f, 640f, 700f), new Vector3(30f, 60f, -40f));
             Render(camera, "FrozenRift-back");
+            Debug.Log("FROZEN_RIFT_ROUTE waypoints=" + routeWaypoints + " length~" + routeLength + "м jumps=" + routeJumps
+                + " checkpoints=" + routeCheckpoints + " scale=" + WorldScale);
             Debug.Log("FROZEN_RIFT_STATIC_SAVED scene=" + Scene);
         }
 
+        [MenuItem("Tools/GOAT/Статичные горы/Ледяной разлом — кадры маршрута")]
+        public static void RouteShots()
+        {
+            if (!Application.isBatchMode && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+            if (!File.Exists(Scene))
+            {
+                Debug.LogError("ROUTE_SHOTS FrozenRift missing scene " + Scene);
+                return;
+            }
+            EditorSceneManager.OpenScene(Scene, OpenSceneMode.Single);
+            var route = TrailRoute();
+            if (route.Count < 2)
+            {
+                Debug.LogError("ROUTE_SHOTS FrozenRift trail not found");
+                return;
+            }
+            var camera = Object.FindFirstObjectByType<Camera>(FindObjectsInactive.Include);
+            if (!camera)
+            {
+                var go = new GameObject("Route Camera");
+                camera = go.AddComponent<Camera>();
+                camera.clearFlags = CameraClearFlags.Skybox;
+                go.AddComponent<GoatDescent.GoatScenePost>();
+            }
+            camera.fieldOfView = 52f; camera.nearClipPlane = .5f; camera.farClipPlane = 3400f * WorldScale;
+            float length = 0f;
+            for (int i = 1; i < route.Count; i++) length += Vector3.Distance(route[i - 1], route[i]);
+            const int count = 8;
+            int rendered = 0;
+            for (int shot = 0; shot < count; shot++)
+            {
+                float at = Mathf.Lerp(12f, Mathf.Max(12f, length - 12f), shot / (float)(count - 1));
+                int index = 1;
+                float walked = 0f;
+                while (index < route.Count - 1 && walked < at)
+                {
+                    walked += Vector3.Distance(route[index - 1], route[index]);
+                    index++;
+                }
+                Vector3 point = route[index];
+                Vector3 behind = route[Mathf.Max(index - 6, 0)];
+                Vector3 ahead = route[Mathf.Min(index + 6, route.Count - 1)];
+                Vector3 tangent = ahead - behind;
+                if (tangent.sqrMagnitude < .0001f) tangent = Vector3.forward;
+                tangent.Normalize();
+                Vector3 world = point * WorldScale;
+                Vector3 look = world + tangent * 25f + Vector3.up * 4f;
+                int lift;
+                Vector3 eye = ClearRouteEye(world + Vector3.up * 12f - tangent * 10f, look, out lift);
+                camera.transform.position = eye;
+                camera.transform.LookAt(look);
+                Debug.Log("ROUTE_SHOTS FrozenRift shot=" + (shot + 1) + " lift=" + lift + "м eye="
+                    + Mathf.RoundToInt(eye.x) + "," + Mathf.RoundToInt(eye.y) + "," + Mathf.RoundToInt(eye.z)
+                    + " ground=" + Mathf.RoundToInt(RouteGround(eye)));
+                Render(camera, "route-FrozenRift-" + (shot + 1).ToString("00"));
+                rendered++;
+            }
+            Debug.Log("ROUTE_SHOTS FrozenRift count=" + rendered);
+        }
+
+        private static Vector3 ClearRouteEye(Vector3 eye, Vector3 look, out int lift)
+        {
+            lift = 0;
+            for (int attempt = 0; attempt < 10; attempt++)
+            {
+                Vector3 direction = look - eye;
+                if (direction.sqrMagnitude < .0001f) direction = Vector3.forward;
+                direction.Normalize();
+                float need = Mathf.Max(0f, RouteGround(eye) + 6f - eye.y);
+                float[] probes = { 10f, 20f, 30f };
+                for (int i = 0; i < probes.Length; i++)
+                {
+                    Vector3 sample = eye + direction * probes[i];
+                    float clearance = sample.y - RouteGround(sample);
+                    float wanted = 4f - i;
+                    if (clearance < wanted) need = Mathf.Max(need, wanted - clearance);
+                }
+                if (need <= .01f) break;
+                float raise = Mathf.Min(need + .25f, 15f);
+                eye.y += raise;
+                lift += Mathf.RoundToInt(raise);
+            }
+            return eye;
+        }
+
+        private static float RouteGround(Vector3 world) =>
+            FrozenRiftTerrain.Height(world.x / WorldScale, world.z / WorldScale) * WorldScale;
+
         private static void PlaceCamera(Camera camera, Vector3 position, Vector3 target)
         {
-            float ground = FrozenRiftTerrain.Height(position.x, position.z) + 10f;
+            position *= WorldScale;
+            target *= WorldScale;
+            float ground = FrozenRiftTerrain.Height(position.x / WorldScale, position.z / WorldScale) * WorldScale + 10f;
             if (ground > position.y) position.y = ground;
             camera.transform.position = position;
             camera.transform.LookAt(target);
@@ -193,22 +293,30 @@ namespace GoatDescent.EditorTools
             float length = 0f;
             for (int i = 0; i < route.Count - 1; i++) length += Vector3.Distance(route[i], route[i + 1]);
             GoatTrailBuilder.Build(parent, "Тропа козы — утоптанный снег", p => FrozenRiftTerrain.Height(p.x, p.z),
-                packed, route, 7f, .3f, 7f, true, new Color(.56f, .56f, .54f));
+                packed, route, 7f, .3f, 0f, true, new Color(.56f, .56f, .54f));
             GoatTrailBuilder.Build(parent, "Тропа козы — протоптанный след", p => FrozenRiftTerrain.Height(p.x, p.z),
                 worn, route, 3.6f, .42f, 0f, true, null);
-            int[] marks = { 2, 10, 17, 24, 29 };
-            string[] names = { "старт на плато", "траверс карниза", "средняя полка", "нижний ярус", "финиш у главной друзы" };
+            TrailBoulders(parent, route);
             var checkpoints = new GameObject("Чекпоинты тропы").transform; checkpoints.SetParent(parent, false);
-            for (int i = 0; i < marks.Length; i++)
+            routeWaypoints = route.Count;
+            routeLength = Mathf.RoundToInt(length);
+            routeCheckpoints = 0;
+            float travelled = 0f;
+            float nextCheckpoint = 0f;
+            for (int i = 0; i < route.Count; i++)
             {
-                Vector3 at = route[marks[i]];
-                Vector3 ahead = route[Mathf.Min(marks[i] + 1, route.Count - 1)];
-                Vector3 behind = route[Mathf.Max(marks[i] - 1, 0)];
+                if (i > 0) travelled += Vector3.Distance(route[i - 1], route[i]);
+                if (travelled < nextCheckpoint) continue;
+                nextCheckpoint += 400f;
+                routeCheckpoints++;
+                Vector3 at = route[i];
+                Vector3 ahead = route[Mathf.Min(i + 1, route.Count - 1)];
+                Vector3 behind = route[Mathf.Max(i - 1, 0)];
                 Vector3 beside = Vector3.Cross(Vector3.up, (ahead - behind).normalized).normalized * Range(random, 4.5f, 7f);
                 var position = at + beside;
                 float size = Range(random, 5f, 8.5f);
                 position.y = FrozenRiftTerrain.Height(position.x, position.z) - size * .35f;
-                var item = new GameObject("Чекпоинт " + (i + 1) + " — " + names[i]);
+                var item = new GameObject("Чекпоинт " + routeCheckpoints);
                 item.transform.SetParent(checkpoints, false); item.transform.position = position;
                 item.transform.rotation = Quaternion.Euler(Range(random, -5f, 5f), Range(random, 0f, 360f), Range(random, -5f, 5f));
                 item.transform.localScale = new Vector3(size, size * .8f, size * .9f);
@@ -217,35 +325,249 @@ namespace GoatDescent.EditorTools
                 item.isStatic = true;
             }
             trailEnd = route[route.Count - 1];
-            Debug.Log("GOAT_TRAIL FrozenRift waypoints=" + route.Count + " length~" + Mathf.RoundToInt(length) + "м");
+            Debug.Log("GOAT_TRAIL FrozenRift waypoints=" + route.Count + " length~" + routeLength + "м");
+        }
+
+        private static void TrailBoulders(Transform parent, List<Vector3> route)
+        {
+            var random = new System.Random(7741);
+            var batch = new FrozenRiftBatch();
+            float travelled = 0f, next = 14f;
+            int index = 0;
+            for (int i = 1; i < route.Count; i++)
+            {
+                float segment = Vector3.Distance(route[i - 1], route[i]);
+                if (segment < .0001f) continue;
+                while (next <= travelled + segment)
+                {
+                    float t = (next - travelled) / segment;
+                    Vector3 point = Vector3.Lerp(route[i - 1], route[i], t);
+                    Vector3 side = Vector3.Cross(Vector3.up, (route[i] - route[i - 1]).normalized).normalized;
+                    float sign = index++ % 2 == 0 ? 1f : -1f;
+                    Vector3 position = point + side * (sign * (4.2f + Range(random, 0f, 3.4f)));
+                    float size = Range(random, 1.8f, 3.8f);
+                    position.y = FrozenRiftTerrain.Height(position.x, position.z) - size * .4f;
+                    batch.Add(boulder, Matrix4x4.TRS(position,
+                        Quaternion.Euler(Range(random, -20f, 20f), Range(random, 0f, 360f), Range(random, -20f, 20f)),
+                        new Vector3(size * Range(random, .9f, 1.3f), size * Range(random, .55f, .95f), size * Range(random, .85f, 1.2f))));
+                    next += Range(random, 20f, 36f);
+                }
+                travelled += segment;
+            }
+            Place(parent, "Валуны по краю тропы", Save(batch.Build("Морозные валуны у тропы"), "TrailBoulders.asset"),
+                rock, Vector3.zero, Vector3.one);
         }
 
         private static List<Vector3> TrailRoute()
         {
-            var u = new[] { 1.34f, 1.26f, 1.18f, 1.11f, 1.05f, 1.01f, .99f, .86f, .845f, .845f, .845f, .845f,
-                .79f, .755f, .74f, .60f, .56f, .52f, .48f, .34f, .30f, .27f, .22f, .08f, .04f, .02f,
-                -.06f, -.02f, .03f, -.05f, -.55f };
-            var z = new[] { 770f, 730f, 694f, 660f, 628f, 600f, 566f, 392f, 390f, 360f, 330f, 305f,
-                285f, 270f, 250f, 110f, 85f, 60f, 40f, -100f, -125f, -150f, -170f, -305f, -330f, -355f,
-                -375f, -400f, -425f, -450f, -470f };
-            var route = new List<Vector3>(u.Length);
-            for (int i = 0; i < u.Length; i++) route.Add(RiftPoint(1, u[i], z[i]));
+            var controls = new List<Vector3>();
+            void Rift(int side, float u, float z) => controls.Add(RiftPoint(side, u, z));
+            void Bed(float z, float t) => controls.Add(new Vector3(FrozenRiftTerrain.BedX(z, t), 0f, z));
+            Rift(-1, 1.20f, 535f); Rift(-1, 1.14f, 520f); Rift(-1, 1.07f, 500f); Rift(-1, 1.05f, 480f);
+            Rift(-1, .96f, 465f); Rift(-1, .84f, 430f); Rift(-1, .80f, 390f); Rift(-1, .82f, 345f);
+            Rift(-1, .79f, 300f); Rift(-1, .81f, 255f);
+            Rift(-1, .64f, 215f); Rift(-1, .57f, 180f);
+            Rift(-1, .55f, 125f); Rift(-1, .56f, 85f); Rift(-1, .54f, 45f); Rift(-1, .57f, 5f);
+            Rift(-1, .55f, -45f); Rift(-1, .56f, -85f);
+            Rift(-1, .41f, -145f); Rift(-1, .33f, -180f);
+            Rift(-1, .31f, -225f); Rift(-1, .32f, -275f); Rift(-1, .29f, -325f); Rift(-1, .31f, -375f);
+            Rift(-1, .30f, -425f);
+            Rift(-1, .18f, -465f); Rift(-1, .08f, -495f);
+            Bed(-520f, -.2f); Bed(-543f, .45f); Bed(-565f, -.45f); Bed(-585f, .2f);
+            Rift(1, .05f, -630f); Rift(1, .08f, -590f); Rift(1, .06f, -550f);
+            Rift(1, .16f, -515f); Rift(1, .28f, -485f);
+            Rift(1, .31f, -445f); Rift(1, .30f, -395f); Rift(1, .32f, -345f); Rift(1, .29f, -295f);
+            Rift(1, .31f, -245f); Rift(1, .30f, -195f);
+            Rift(1, .42f, -155f); Rift(1, .54f, -120f);
+            Rift(1, .56f, -60f); Rift(1, .55f, 0f); Rift(1, .57f, 60f); Rift(1, .54f, 120f);
+            Rift(1, .68f, 210f); Rift(1, .80f, 250f);
+            Rift(1, .82f, 295f); Rift(1, .79f, 345f); Rift(1, .81f, 395f); Rift(1, .78f, 445f);
+            Rift(1, 1.04f, 470f); Rift(1, 1.06f, 500f); Rift(1, 1.03f, 525f);
+            Rift(1, .98f, 540f); Rift(1, .90f, 558f); Rift(1, .86f, 574f);
+
+            const int divisions = 32;
+            var dense = new List<Vector3>(controls.Count * divisions);
+            for (int i = 0; i < controls.Count - 1; i++)
+            {
+                Vector3 p0 = controls[Mathf.Max(i - 1, 0)], p1 = controls[i];
+                Vector3 p2 = controls[i + 1], p3 = controls[Mathf.Min(i + 2, controls.Count - 1)];
+                for (int k = 0; k < divisions; k++) dense.Add(Catmull(p0, p1, p2, p3, k / (float)divisions));
+            }
+            dense.Add(controls[controls.Count - 1]);
+            var route = ResampleRoute(dense, TrailStep);
+            for (int i = 0; i < route.Count; i++)
+            {
+                Vector3 point = route[i];
+                point.y = FrozenRiftTerrain.Height(point.x, point.z);
+                route[i] = point;
+            }
+            return route;
+        }
+
+        private static Vector3 Catmull(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
+        {
+            float t2 = t * t, t3 = t2 * t;
+            return .5f * (2f * p1 + (-p0 + p2) * t + (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2
+                + (-p0 + 3f * p1 - 3f * p2 + p3) * t3);
+        }
+
+        private static List<Vector3> ResampleRoute(List<Vector3> dense, float step)
+        {
+            var route = new List<Vector3> { dense[0] };
+            float total = 0f, next = step;
+            for (int i = 0; i < dense.Count - 1; i++)
+            {
+                float segment = Vector3.Distance(dense[i], dense[i + 1]);
+                if (segment < .0001f) continue;
+                while (next <= total + segment)
+                {
+                    route.Add(Vector3.Lerp(dense[i], dense[i + 1], (next - total) / segment));
+                    next += step;
+                }
+                total += segment;
+            }
+            if (Vector3.Distance(route[route.Count - 1], dense[dense.Count - 1]) > step * .3f)
+                route.Add(dense[dense.Count - 1]);
             return route;
         }
 
         private static void JumpSpots(FrozenRiftBatch snowBatch, FrozenRiftBatch iceBatch, System.Random random)
         {
-            if (trail == null || trail.Count < 2) return;
-            Ledge(snowBatch, random, 4, 3, 7f, 2.6f);
-            Ledge(snowBatch, random, 12, 2, 8f, 3.2f);
-            Ledge(snowBatch, random, 17, 3, 6.5f, 2.8f);
-            Ledge(snowBatch, random, 22, 2, 7.5f, 2.4f);
-            Ledge(snowBatch, random, 26, 3, 6f, 3f);
-            Bridge(iceBatch, random, 6, 5.2f);
-            Bridge(iceBatch, random, 15, 4.2f);
-            Bridge(iceBatch, random, 23, 4.8f);
-            Chute(snowBatch, random, 29, 9f);
-            Chute(snowBatch, random, 9, 7f);
+            if (trail == null || trail.Count < 3) return;
+            routeJumps = 0;
+            float travelled = 0f, next = Range(random, 30f, 40f);
+            for (int i = 1; i < trail.Count; i++)
+            {
+                travelled += Vector3.Distance(trail[i - 1], trail[i]);
+                if (travelled < next) continue;
+                JumpCluster(snowBatch, iceBatch, random, i);
+                routeJumps++;
+                next = travelled + Range(random, 28f, 44f);
+            }
+        }
+
+        private static void JumpCluster(FrozenRiftBatch batch, FrozenRiftBatch ice, System.Random random, int index)
+        {
+            Vector3 point = trail[index];
+            Vector3 ahead = trail[Mathf.Min(index + 2, trail.Count - 1)];
+            Vector3 behind = trail[Mathf.Max(index - 2, 0)];
+            Vector3 heading = new Vector3(ahead.x - behind.x, 0f, ahead.z - behind.z);
+            if (heading.sqrMagnitude < .04f) heading = Vector3.forward;
+            heading.Normalize();
+            Vector3 side = Vector3.Cross(Vector3.up, heading).normalized;
+            int steps = 3 + (random.Next(3) == 0 ? 1 : 0);
+            float spacing = Range(random, 3.15f, 3.45f);
+            float previousTop = FrozenRiftTerrain.Height(point.x, point.z) + .35f;
+            for (int step = 0; step < steps; step++)
+            {
+                float along = (step - (steps - 1) * .5f) * spacing;
+                float lateral = Mathf.Sin(step * 2.1f + index * .7f) * Range(random, .05f, .2f);
+                Vector3 probe = point + heading * along + side * lateral;
+                float ground = FrozenRiftTerrain.Height(probe.x, probe.z);
+                float size = Range(random, 3.5f, 5f);
+                float top = ground + .65f;
+                if (step > 0) top = Mathf.Clamp(top, previousTop - 1.1f, previousTop + 1.1f);
+                previousTop = top;
+                JumpPad(batch, probe, heading, size, top, Mathf.Min(ground, top) - 1.2f);
+                if (random.Next(4) == 0)
+                    Ice(ice, random, probe + side * (size * .5f + 1.1f),
+                        (Vector3.up * .85f + side * .4f).normalized, Range(random, 1.4f, 2.6f), Range(random, .7f, 1.3f), .25f);
+            }
+        }
+
+        private static void JumpPad(FrozenRiftBatch batch, Vector3 centre, Vector3 forward, float diameter,
+            float top, float bottom)
+        {
+            Vector3 side = Vector3.Cross(Vector3.up, forward).normalized;
+            float hash = Hash01(centre.x * .37f + centre.z * .71f + 13.7f);
+            int sides = 14 + Mathf.Min(6, Mathf.FloorToInt(hash * 6.99f));
+            float seed = hash * 47f + 3.1f;
+            var radius = new float[sides];
+            float reach = 0f;
+            for (int i = 0; i < sides; i++)
+            {
+                float angle = i / (float)sides * Mathf.PI * 2f;
+                float nx = Mathf.Cos(angle) + seed, nz = Mathf.Sin(angle) + seed;
+                float n = .58f * Mathf.PerlinNoise(nx * 1.35f + 7.3f, nz * 1.35f + 2.9f)
+                    + .28f * Mathf.PerlinNoise(nx * 3.1f + 4.7f, nz * 3.1f + 9.7f)
+                    + .14f * Mathf.PerlinNoise(nx * 6.3f + 1.9f, nz * 6.3f + 6.1f);
+                radius[i] = .72f + n * .58f;
+                reach = Mathf.Max(reach, radius[i]);
+            }
+            float scale = diameter * .5f / Mathf.Max(.001f, reach);
+            float dome = .16f + .1f * Hash01(hash * 91.7f + 5.3f);
+            var dirs = new Vector3[sides];
+            var rims = new Vector3[sides];
+            var rimY = new float[sides];
+            for (int i = 0; i < sides; i++)
+            {
+                float angle = i / (float)sides * Mathf.PI * 2f;
+                dirs[i] = (forward * Mathf.Cos(angle) + side * Mathf.Sin(angle)).normalized;
+                Vector3 p = centre + dirs[i] * (radius[i] * scale);
+                float rimGround = FrozenRiftTerrain.Height(p.x, p.z);
+                float relief = Mathf.Max(.05f, top - rimGround);
+                float burial = .4f + .1f * Mathf.PerlinNoise(p.x * 2.3f + 6.1f, p.z * 2.3f + 8.7f);
+                float y = Mathf.Min(rimGround + relief * (1f - burial), top - .08f);
+                y += (Mathf.PerlinNoise(p.x * 4.7f + 2.3f, p.z * 4.7f + 7.9f) - .5f) * .08f;
+                rimY[i] = y;
+                rims[i] = new Vector3(p.x, y, p.z);
+            }
+            var ringT = new[] { .24f, .44f, .66f, .84f };
+            var rings = new Vector3[ringT.Length][];
+            for (int j = 0; j < ringT.Length; j++)
+            {
+                float t = ringT[j];
+                var ring = new Vector3[sides];
+                for (int i = 0; i < sides; i++)
+                {
+                    Vector3 p = centre + dirs[i] * (radius[i] * scale * t);
+                    float n = Mathf.PerlinNoise(p.x * 2.1f + 3.7f, p.z * 2.1f + 9.3f) - .5f;
+                    float fine = Mathf.PerlinNoise(p.x * 5.3f + 8.1f, p.z * 5.3f + 2.3f) - .5f;
+                    float profile = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.42f, 1f, t));
+                    float y = top - dome * profile + (n * .16f + fine * .06f) * (.35f + t);
+                    float sink = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.55f, 1f, t));
+                    y = Mathf.Lerp(y, rimY[i] - .02f, sink * .85f);
+                    ring[i] = new Vector3(p.x, y, p.z);
+                }
+                rings[j] = ring;
+            }
+            var crown = new Vector3(centre.x, top, centre.z);
+            for (int i = 0; i < sides; i++)
+                UpTriangle(batch, crown, rings[0][i], rings[0][(i + 1) % sides]);
+            for (int j = 0; j < rings.Length - 1; j++)
+                for (int i = 0; i < sides; i++)
+                    UpQuad(batch, rings[j][i], rings[j][(i + 1) % sides],
+                        rings[j + 1][(i + 1) % sides], rings[j + 1][i]);
+            for (int i = 0; i < sides; i++)
+                UpQuad(batch, rings[rings.Length - 1][i], rings[rings.Length - 1][(i + 1) % sides],
+                    rims[(i + 1) % sides], rims[i]);
+            for (int i = 0; i < sides; i++)
+            {
+                Vector3 a = rims[i], b = rims[(i + 1) % sides];
+                float lowA = Mathf.Min(bottom, FrozenRiftTerrain.Height(a.x, a.z) - .4f);
+                float lowB = Mathf.Min(bottom, FrozenRiftTerrain.Height(b.x, b.z) - .4f);
+                Skirt(batch, a, b, lowA, lowB);
+            }
+        }
+
+        private static void UpTriangle(FrozenRiftBatch batch, Vector3 a, Vector3 b, Vector3 c)
+        {
+            if (Vector3.Cross(b - a, c - a).y < 0f) batch.Triangle(a, c, b);
+            else batch.Triangle(a, b, c);
+        }
+
+        private static float Hash01(float value)
+        {
+            float hash = Mathf.Sin(value * 127.1f + 311.7f) * 43758.5453f;
+            return hash - Mathf.Floor(hash);
+        }
+
+        private static void Skirt(FrozenRiftBatch batch, Vector3 a, Vector3 b, float bottomA, float bottomB)
+        {
+            var a0 = new Vector3(a.x, bottomA, a.z);
+            var b0 = new Vector3(b.x, bottomB, b.z);
+            batch.Quad(a, b, b0, a0);
+            batch.Quad(b, a, a0, b0);
         }
 
         private static Vector3 RouteAt(int index, float t, out Vector3 tangent)
@@ -723,7 +1045,7 @@ namespace GoatDescent.EditorTools
             RenderSettings.ambientSkyColor = new Color(.68f, .76f, .88f); RenderSettings.ambientEquatorColor = new Color(.6f, .68f, .79f);
             RenderSettings.ambientGroundColor = new Color(.5f, .53f, .62f); RenderSettings.ambientIntensity = 1f;
             RenderSettings.fog = true; RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogColor = new Color(.64f, .74f, .87f); RenderSettings.fogDensity = .00015f;
+            RenderSettings.fogColor = new Color(.64f, .74f, .87f); RenderSettings.fogDensity = .00015f / WorldScale;
             var sun = new GameObject("Холодное полярное солнце").AddComponent<Light>(); sun.type = LightType.Directional;
             sun.color = new Color(1f, .96f, .88f); sun.intensity = .58f; sun.shadows = LightShadows.Soft;
             sun.transform.rotation = Quaternion.Euler(38f, -45f, 0f); RenderSettings.sun = sun;

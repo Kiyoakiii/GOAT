@@ -25,9 +25,9 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _Radius: 290
+    - _Radius: 1450
     - _Smoothness: 0.55
-    - _WaveScale: 0.012
+    - _WaveScale: 0.0024
     - _WaveSpeed: 0.6
     m_Colors:
     - _Center: {r: 0, g: 0, b: 0, a: 0}

@@ -15,7 +15,7 @@ namespace GoatDescent.EditorTools
         public static readonly float[] OuterRadius = { 0f, 430f, 480f, 530f };
         public static readonly float[] FallAngles = { .10f, .55f, 1.80f, 3.90f, 4.60f };
         public static readonly float[] FallWidths = { 74f, 48f, 58f, 42f, 66f };
-        public static readonly int[] FallTops = { 3, 3, 2, 2, 3 };
+        public static readonly int[] FallTops = { 3, 3, 2, 2, 2 };
         public static readonly int[] FallBottoms = { 3, 1, 2, 1, 1 };
         public static readonly float[] IslandAngles = { 0f, 2.35f, 4.55f };
         public static readonly float[] IslandOffsets = { 0f, 130f, 205f };
@@ -31,12 +31,49 @@ namespace GoatDescent.EditorTools
             { 1.75f, 4.55f, -99f }
         };
         private const int Sides = 192;
+        private static readonly float[] BoundaryRadius = { 380f, 430f, 480f, 530f };
+        private static readonly float[,] Breaches =
+        {
+            { 1.24f, .13f, 2.91f, .09f },
+            { -99f, .10f, -99f, .10f },
+            { 2.60f, .14f, 5.60f, .11f },
+            { .95f, .20f, 2.35f, .16f }
+        };
+        private static readonly float[] RimBreaches = { 4.30f, .18f };
 
-        public static float RingScale(float angle) => 1f + Ring(angle, 17.3f, 1.6f) * .23f;
+        public static float EdgeRadius(int boundary, float angle)
+        {
+            float noise = Ring(angle, 3.1f + boundary * 9.7f, 2.7f) * .55f
+                + Ring(angle, 11.9f + boundary * 4.3f, 6.1f) * .30f
+                + Ring(angle, 7.7f + boundary * 6.1f, 12.7f) * .15f;
+            float radius = BoundaryRadius[boundary] * (1f + noise * .12f);
+            radius -= BreachMask(boundary, angle) * BoundaryRadius[boundary] * .06f;
+            return radius;
+        }
 
-        public static float TierInner(int tier, float angle) => InnerRadius[tier] * RingScale(angle);
+        public static float BreachMask(int boundary, float angle)
+        {
+            float mask = 0f;
+            for (int index = 0; index < 2; index++)
+            {
+                float centre = Breaches[boundary, index * 2];
+                if (centre < -50f) continue;
+                float width = Breaches[boundary, index * 2 + 1];
+                mask = Mathf.Max(mask, Span(angle, centre, width));
+            }
+            if (boundary == 3) mask = Mathf.Max(mask, Span(angle, RimBreaches[0], RimBreaches[1]));
+            return mask;
+        }
 
-        public static float TierOuter(int tier, float angle) => OuterRadius[tier] * RingScale(angle);
+        private static float Span(float angle, float centre, float width)
+        {
+            float distance = Mathf.Abs(Mathf.DeltaAngle(angle * Mathf.Rad2Deg, centre * Mathf.Rad2Deg)) * Mathf.Deg2Rad;
+            return Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(width, width * .28f, distance));
+        }
+
+        public static float TierInner(int tier, float angle) => EdgeRadius(tier - 1, angle);
+
+        public static float TierOuter(int tier, float angle) => EdgeRadius(tier, angle);
 
         public static float CollapseMask(int tier, float angle)
         {
@@ -55,6 +92,12 @@ namespace GoatDescent.EditorTools
             var angles = new List<float>();
             for (int index = 0; index < 3; index++)
                 if (CollapseCentres[tier, index] > -50f) angles.Add(CollapseCentres[tier, index]);
+            for (int index = 0; index < 2; index++)
+            {
+                float centre = Breaches[tier, index * 2];
+                if (centre > -50f) angles.Add(centre);
+            }
+            if (tier == 3) angles.Add(RimBreaches[0]);
             return angles.ToArray();
         }
 
@@ -131,14 +174,25 @@ namespace GoatDescent.EditorTools
 
         public static float WallRadius(int tier, float angle, float v)
         {
-            float radius = Mathf.Lerp(InnerRadius[tier] - 3f, InnerRadius[tier] + 7f, v) * RingScale(angle);
+            float radius = EdgeRadius(tier - 1, angle) + Mathf.Lerp(-3f, 7f, v);
             radius -= GullyDepth(tier, angle) * (1f - v);
             radius += CollapseMask(tier, angle) * 5f;
             radius += Mathf.Sin(angle * 21f + tier * 2.1f) * 1.4f;
             radius += Mathf.Sin(angle * 47f + tier * 1.3f) * .55f;
             radius += Mathf.Sin(angle * 7f + tier) * (2.8f + v * 1.6f);
             radius += Mathf.Sin(v * 9.4f + tier * 1.7f) * 2.4f;
+            radius += Mathf.Sin(angle * (9f + tier * 2.3f) + v * 6.3f + Mathf.Sin(v * 3.1f + tier) * 1.8f) * (1.8f + v * 2.4f);
+            radius += Ring(angle, 23.7f + tier * 5.3f, 21f) * (5.5f + v * 4f);
+            radius -= BreachMask(tier - 1, angle) * 4f * v * v;
             return radius;
+        }
+
+        public static float ShelfWander(int tier, float angle)
+        {
+            float noise = Ring(angle, 6.4f + tier * 4.2f, 2.6f) * .55f
+                + Ring(angle, 13.7f + tier * 2.8f, 7.1f) * .30f
+                + Ring(angle, 9.3f + tier * 5.5f, 15.3f) * .15f;
+            return noise * 10f;
         }
 
         public static float WallHeight(int tier, float angle, float v)
@@ -148,11 +202,12 @@ namespace GoatDescent.EditorTools
             float y = Mathf.Lerp(baseY, rampY, CollapseMask(tier, angle));
             y += Mathf.Sin(v * 12f + tier) * 1.2f;
             y += Mathf.Sin(angle * 13f + tier * 3f) * 1.3f * Mathf.Sin(v * Mathf.PI);
+            y += ShelfWander(tier, angle) * v * v;
             return y;
         }
 
         public static float ShelfOuter(int tier, float angle)
-            => OuterRadius[tier] * RingScale(angle) + Ring(angle, tier * 2.3f + 4f, 2.1f) * 7f;
+            => EdgeRadius(tier, angle) + Ring(angle, tier * 2.3f + 4f, 2.1f) * 7f;
 
         public static float ShelfNoise(int tier, float angle, float t)
             => Ring(angle, tier * 4.1f + 9f, 2.6f) * 4f * (.35f + .65f * Mathf.Sin(t * Mathf.PI));
@@ -162,7 +217,9 @@ namespace GoatDescent.EditorTools
             float inner = WallRadius(tier, angle, 1f);
             float outer = ShelfOuter(tier, angle);
             float t = Mathf.Clamp01((radius - inner) / Mathf.Max(1f, outer - inner));
-            return ShelfLevel[tier] + t * 3f + ShelfNoise(tier, angle, t);
+            float y = ShelfLevel[tier] + ShelfWander(tier, angle) * (1f - .15f * t) + t * 3f + ShelfNoise(tier, angle, t);
+            y -= BreachMask(tier, angle) * (tier == 3 ? 46f : 18f) * Mathf.SmoothStep(0f, 1f, t);
+            return y;
         }
 
         public static float FloorHeight(float angle, float radius)
@@ -219,24 +276,28 @@ namespace GoatDescent.EditorTools
         private static float Ridge(float radius, float spine, float width)
             => Mathf.Pow(Mathf.Max(0f, 1f - Mathf.Abs(radius - spine) / width), 1.35f);
 
-        public static Mesh TerraceWall(int tier)
+        public static Mesh TerraceWall(int tier, float from, float to)
         {
             var mesh = new CrownRockMesh();
-            const int wallRows = 16;
-            var wall = new Vector3[wallRows, Sides];
-            for (int side = 0; side < Sides; side++)
+            const int wallRows = 26;
+            int spans = Mathf.Max(8, Mathf.RoundToInt((to - from) / (Mathf.PI * 2f) * Sides));
+            var wall = new Vector3[wallRows, spans + 1];
+            for (int side = 0; side <= spans; side++)
             {
-                float angle = side * Mathf.PI * 2f / Sides;
+                float angle = Mathf.Lerp(from, to, side / (float)spans);
                 for (int row = 0; row < wallRows; row++)
                 {
                     float v = row / (wallRows - 1f);
                     float radius = WallRadius(tier, angle, v);
-                    wall[row, side] = new Vector3(Mathf.Cos(angle) * radius, WallHeight(tier, angle, v), Mathf.Sin(angle) * radius);
+                    float shear = (Mathf.Sin(angle * 5.3f + v * 4.7f + tier * 1.9f) * 10f
+                        + Ring(angle, 31.1f + tier * 3.3f, 27f) * 9f) * Mathf.Sin(v * Mathf.PI);
+                    float shifted = angle + shear / Mathf.Max(80f, radius);
+                    wall[row, side] = new Vector3(Mathf.Cos(shifted) * radius, WallHeight(tier, angle, v), Mathf.Sin(shifted) * radius);
                 }
             }
-            for (int side = 0; side < Sides; side++)
+            for (int side = 0; side < spans; side++)
             {
-                int next = (side + 1) % Sides;
+                int next = side + 1;
                 for (int row = 0; row < wallRows - 1; row++)
                 {
                     Quad(mesh, wall[row, side], wall[row, next], wall[row + 1, next], wall[row + 1, side]);
@@ -313,7 +374,7 @@ namespace GoatDescent.EditorTools
         {
             float inner = ShelfOuter(3, angle);
             float blend = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(inner, inner + 70f, radius));
-            return Mathf.Lerp(ShelfLevel[3] + 3f, OuterHeight(angle, radius), blend);
+            return Mathf.Lerp(ShelfHeight(3, angle, inner), OuterHeight(angle, radius), blend);
         }
 
         public static Mesh OuterSlopes()
@@ -432,9 +493,9 @@ namespace GoatDescent.EditorTools
             const int sides = 8;
             for (int tier = 0; tier < 6; tier++)
             {
-                float bottom = .17f + tier * .115f;
-                float top = bottom + .28f;
-                float width = .25f * (1f - tier * .115f);
+                float bottom = .11f + tier * .115f;
+                float top = bottom + .30f;
+                float width = .40f * (1f - tier * .09f);
                 var apex = new Vector3(Mathf.Sin(tier * 2.1f) * .02f, top, Mathf.Cos(tier * 1.3f) * .02f);
                 for (int side = 0; side < sides; side++)
                 {
@@ -494,17 +555,23 @@ namespace GoatDescent.EditorTools
         public static Mesh Boulder(int seed)
         {
             var mesh = new CrownRockMesh();
-            const int sides = 9;
+            const int sides = 10;
             var heights = new[] { 0f, .34f, .7f, 1f };
             var widths = new[] { .72f, 1f, .9f, .36f };
             var points = new Vector3[heights.Length, sides];
+            float leanX = Mathf.Sin(seed * 1.31f) * .08f;
+            float leanZ = Mathf.Cos(seed * 2.17f) * .08f;
             for (int side = 0; side < sides; side++)
             {
                 float angle = side * Mathf.PI * 2f / sides;
                 for (int ring = 0; ring < heights.Length; ring++)
                 {
-                    float radius = widths[ring] * (1f + Mathf.Sin(angle * 3.1f + seed * 1.7f + ring * 1.3f) * .17f);
-                    points[ring, side] = new Vector3(Mathf.Cos(angle) * radius, heights[ring], Mathf.Sin(angle) * radius * .82f);
+                    float radius = widths[ring] * (1f + Mathf.Sin(angle * 3.1f + seed * 1.7f + ring * 1.3f) * .16f
+                        + Mathf.Sin(angle * 5.9f + seed * 2.9f + ring * .9f) * .09f
+                        + Mathf.Sin(angle * 9.7f + seed * .7f + ring * 2.1f) * .05f);
+                    float y = heights[ring] * (1f + Mathf.Sin(angle * 2.3f + seed * 1.1f + ring * .8f) * .07f);
+                    points[ring, side] = new Vector3(Mathf.Cos(angle) * radius + leanX * ring, y,
+                        Mathf.Sin(angle) * radius * .84f + leanZ * ring);
                 }
             }
             for (int side = 0; side < sides; side++)
@@ -512,8 +579,8 @@ namespace GoatDescent.EditorTools
                 int next = (side + 1) % sides;
                 for (int ring = 0; ring < heights.Length - 1; ring++)
                     Quad(mesh, points[ring, side], points[ring + 1, side], points[ring + 1, next], points[ring, next]);
-                Tri(mesh, new Vector3(0f, 1.04f, 0f), points[heights.Length - 1, next], points[heights.Length - 1, side]);
-                Tri(mesh, new Vector3(0f, -.06f, 0f), points[0, side], points[0, next]);
+                Tri(mesh, new Vector3(leanX * 3f, 1.05f, leanZ * 3f), points[heights.Length - 1, next], points[heights.Length - 1, side]);
+                Tri(mesh, new Vector3(0f, -.07f, 0f), points[0, side], points[0, next]);
             }
             return mesh.Build("Валун " + seed);
         }
@@ -521,37 +588,168 @@ namespace GoatDescent.EditorTools
         public static Mesh Ledge(int seed)
         {
             var mesh = new CrownRockMesh();
-            const int sides = 11;
-            var heights = new[] { 0f, .24f, .56f, .76f };
-            var widths = new[] { 1f, .95f, .66f, .28f };
-            var points = new Vector3[heights.Length, sides];
+            var random = new System.Random(seed);
+            int lobes = 2 + seed % 2;
+            var lobeAngle = new float[lobes];
+            var lobeOffset = new float[lobes];
+            var lobeRadius = new float[lobes];
+            for (int lobe = 0; lobe < lobes; lobe++)
+            {
+                lobeAngle[lobe] = lobe * (Mathf.PI * 2f / lobes) + ((float)random.NextDouble() - .5f) * 1.1f;
+                lobeOffset[lobe] = lobe == 0 ? (float)random.NextDouble() * .14f : .26f + (float)random.NextDouble() * .26f;
+                lobeRadius[lobe] = lobe == 0 ? .6f + (float)random.NextDouble() * .18f : .32f + (float)random.NextDouble() * .24f;
+            }
+            const int sides = 30;
+            float Reach(float angle)
+            {
+                float fused = 0f;
+                for (int lobe = 0; lobe < lobes; lobe++)
+                {
+                    float delta = Mathf.Abs(Mathf.DeltaAngle(angle * Mathf.Rad2Deg, lobeAngle[lobe] * Mathf.Rad2Deg)) * Mathf.Deg2Rad;
+                    float adjacent = lobeOffset[lobe] * Mathf.Cos(delta);
+                    float opposite = lobeOffset[lobe] * Mathf.Sin(delta);
+                    float ray = adjacent + Mathf.Sqrt(Mathf.Max(.002f, lobeRadius[lobe] * lobeRadius[lobe] - opposite * opposite));
+                    fused += Mathf.Pow(Mathf.Max(.04f, ray), 6f);
+                }
+                float reach = Mathf.Pow(fused, 1f / 6f);
+                reach += Ring(angle, seed + 3.1f, 2.3f) * .11f;
+                reach += Ring(angle, seed + 7.7f, 5.9f) * .065f;
+                if (seed % 2 == 1) reach += Ring(angle, seed + 11.3f, 12.7f) * .04f;
+                return reach;
+            }
+            var outline = new float[sides];
+            float widest = .001f;
+            for (int side = 0; side < sides; side++)
+            {
+                outline[side] = Reach(side * Mathf.PI * 2f / sides);
+                widest = Mathf.Max(widest, outline[side]);
+            }
+            float grooveCount = 3f + random.Next(0, 3);
+            float grooveDepth = .05f + (float)random.NextDouble() * .035f;
+            float grooveWarp = ((float)random.NextDouble() - .5f) * 1.6f;
+            float crown = .1f + (float)random.NextDouble() * .07f;
+            var skirtFactor = new[] { 1.38f, 1.22f, 1.08f, 1f };
+            var skirtHeight = new[] { -.28f, -.14f, .02f, .22f };
+            var points = new Vector3[skirtFactor.Length, sides];
             for (int side = 0; side < sides; side++)
             {
                 float angle = side * Mathf.PI * 2f / sides;
+                float rim = outline[side] / widest * .98f;
+                for (int ring = 0; ring < skirtFactor.Length; ring++)
+                {
+                    float radius = rim * skirtFactor[ring] * (1f + Mathf.Sin(angle * 6.3f + seed * 1.9f + ring * 2.2f) * .05f);
+                    float y = skirtHeight[ring] + Ring(angle, seed + 4.4f + ring * .8f, 3.1f) * .05f;
+                    points[ring, side] = new Vector3(Mathf.Cos(angle) * radius, y, Mathf.Sin(angle) * radius * .85f);
+                }
+            }
+            const int crownRings = 5;
+            var top = new Vector3[crownRings + 1, sides];
+            for (int side = 0; side < sides; side++)
+            {
+                float angle = side * Mathf.PI * 2f / sides;
+                float rim = outline[side] / widest * .98f;
+                for (int ring = 0; ring <= crownRings; ring++)
+                {
+                    float q = 1f - .88f * ring / crownRings;
+                    float groove = Mathf.Pow(Mathf.Max(0f, Mathf.Sin(angle * grooveCount + q * grooveWarp + seed * .37f)), 2.5f)
+                        * grooveDepth * Mathf.SmoothStep(.25f, .9f, q);
+                    float y = .42f + crown * (1f - q * q) + Ring(angle, seed + 5.2f, 3.3f) * .05f * (1f - q * .5f)
+                        + Ring(angle, seed + 8.8f, 6.1f) * .02f - groove;
+                    top[ring, side] = new Vector3(Mathf.Cos(angle) * rim * q, y, Mathf.Sin(angle) * rim * q * .85f);
+                }
+            }
+            float apex = 0f;
+            for (int side = 0; side < sides; side++) apex += top[crownRings, side].y;
+            apex /= sides;
+            var apexPoint = new Vector3(0f, apex, 0f);
+            var bottomPoint = new Vector3(0f, skirtHeight[0] - .02f, 0f);
+            for (int side = 0; side < sides; side++)
+            {
+                int next = (side + 1) % sides;
+                for (int ring = 0; ring < skirtFactor.Length - 1; ring++)
+                    Quad(mesh, points[ring, side], points[ring + 1, side], points[ring + 1, next], points[ring, next]);
+                Quad(mesh, points[skirtFactor.Length - 1, side], top[0, side], top[0, next], points[skirtFactor.Length - 1, next]);
+                for (int ring = 0; ring < crownRings; ring++)
+                    Quad(mesh, top[ring + 1, side], top[ring + 1, next], top[ring, next], top[ring, side]);
+                Tri(mesh, apexPoint, top[crownRings, next], top[crownRings, side]);
+                Tri(mesh, bottomPoint, points[0, side], points[0, next]);
+            }
+            return mesh.Build("Природная полка-ступень " + seed);
+        }
+
+        public static Mesh Landing(int seed)
+        {
+            var mesh = new CrownRockMesh();
+            var random = new System.Random(seed);
+            const int sides = 20;
+            var heights = new[] { 0f, .20f, .44f, .68f, .88f, 1f };
+            var widths = new[] { 1.02f, 1f, .93f, .79f, .56f, .26f };
+            var rings = new Vector3[heights.Length, sides];
+            float leanX = ((float)random.NextDouble() - .5f) * .14f;
+            float leanZ = ((float)random.NextDouble() - .5f) * .14f;
+            for (int side = 0; side < sides; side++)
+            {
+                float angle = side * Mathf.PI * 2f / sides;
+                float edge = 1f + Mathf.Sin(angle * 3.1f + seed * 1.7f) * .11f
+                    + Mathf.Sin(angle * 6.7f + seed * .9f) * .06f
+                    + Mathf.Sin(angle * 11.3f + seed * 2.3f) * .035f;
                 for (int ring = 0; ring < heights.Length; ring++)
                 {
-                    float stretch = 1f + Mathf.Sin(angle * 1.7f + seed * .9f) * .22f + Mathf.Sin(angle * 3.3f + seed * 1.6f + ring * .8f) * .1f;
-                    float radius = widths[ring] * stretch * (1f + Mathf.Sin(angle * 4.9f + seed * 2.3f) * .07f);
-                    float y = heights[ring] * (1f + Mathf.Sin(angle * 2.6f + seed * 1.1f) * .07f + Mathf.Sin(angle * 5.7f + ring) * .03f);
-                    points[ring, side] = new Vector3(Mathf.Cos(angle) * radius, y, Mathf.Sin(angle) * radius * .78f);
+                    float radius = widths[ring] * (edge + Mathf.Sin(angle * 4.3f + seed * 1.3f + ring * 1.7f) * .035f);
+                    float y = heights[ring] * (1f + Mathf.Sin(angle * 2.5f + seed * 1.1f + ring * 1.3f) * .05f);
+                    rings[ring, side] = new Vector3(
+                        Mathf.Cos(angle) * radius + leanX * (1f - heights[ring]), y,
+                        Mathf.Sin(angle) * radius * .9f + leanZ * (1f - heights[ring]));
+                }
+            }
+            var apex = Vector3.zero;
+            for (int side = 0; side < sides; side++) apex += rings[heights.Length - 1, side];
+            apex /= sides;
+            apex.y += .045f;
+            var bottom = new Vector3(leanX, -.02f, leanZ);
+            for (int side = 0; side < sides; side++)
+            {
+                int next = (side + 1) % sides;
+                for (int ring = 0; ring < heights.Length - 1; ring++)
+                    Quad(mesh, rings[ring, side], rings[ring + 1, side], rings[ring + 1, next], rings[ring, next]);
+                Tri(mesh, apex, rings[heights.Length - 1, next], rings[heights.Length - 1, side]);
+                Tri(mesh, bottom, rings[0, side], rings[0, next]);
+            }
+            return mesh.Build("Плита приземления " + seed);
+        }
+
+        public static Mesh MidHill(int seed)
+        {
+            var grid = new PolarGrid();
+            const int sides = 40, rings = 12;
+            var index = new int[rings + 1, sides];
+            for (int side = 0; side < sides; side++)
+            {
+                float angle = side * Mathf.PI * 2f / sides;
+                float wobble = 1f + Mathf.Sin(angle * 3.1f + seed * 1.7f) * .13f + Mathf.Sin(angle * 7.7f + seed * .9f) * .05f;
+                for (int ring = 0; ring <= rings; ring++)
+                {
+                    float t = ring / (float)rings;
+                    float radius = Mathf.Pow(1f - t, .72f) * wobble;
+                    float y = Mathf.Pow(t, 1.22f) * (1f + Mathf.Sin(angle * 2.3f + seed * 1.3f) * .16f
+                        + Mathf.Sin(angle * 5.1f + t * 3.2f + seed) * .08f);
+                    index[ring, side] = grid.Add(new Vector3(Mathf.Cos(angle) * radius, y - .06f, Mathf.Sin(angle) * radius));
                 }
             }
             for (int side = 0; side < sides; side++)
             {
                 int next = (side + 1) % sides;
-                for (int ring = 0; ring < heights.Length - 1; ring++)
-                    Quad(mesh, points[ring, side], points[ring + 1, side], points[ring + 1, next], points[ring, next]);
-                Tri(mesh, new Vector3(0f, .8f, 0f), points[heights.Length - 1, next], points[heights.Length - 1, side]);
-                Tri(mesh, new Vector3(0f, -.06f, 0f), points[0, side], points[0, next]);
+                for (int ring = 0; ring < rings; ring++)
+                    grid.Quad(index[ring, side], index[ring, next], index[ring + 1, next], index[ring + 1, side]);
             }
-            return mesh.Build("Природная полка-ступень " + seed);
+            return grid.Build("Средний план — холм " + seed);
         }
 
         public static Mesh Cascade(int tier)
         {
             var mesh = new CrownRockMesh();
             float height = ShelfLevel[tier] - ShelfLevel[tier - 1];
-            const int rows = 16, cols = 4;
+            const int rows = 18, cols = 9;
             var sheet = new Vector3[rows + 1, cols + 1];
             var shade = new Color[rows + 1, cols + 1];
             for (int row = 0; row <= rows; row++)
@@ -565,9 +763,11 @@ namespace GoatDescent.EditorTools
                 {
                     float u = col / (float)cols;
                     float x = Mathf.Lerp(-.5f, .5f, u) * taper * ragged;
-                    float bow = Mathf.Cos(u * Mathf.PI - Mathf.PI * .5f) * 1.4f;
-                    float sway = Mathf.Sin(v * 2.6f + tier * 1.7f) * 2.2f + Mathf.Sin(v * 5.9f + u * 4.3f + tier) * .8f;
-                    sheet[row, col] = new Vector3(x, y, z + bow + sway + Mathf.Sin(u * 3.1f + v * 2.2f) * .4f);
+                    float bow = Mathf.Cos(u * Mathf.PI - Mathf.PI * .5f) * .5f;
+                    float curl = (u - .5f) * (u - .5f) * (1.6f + .8f * v);
+                    float sway = Mathf.Sin(v * 2.6f + tier * 1.7f) * 2.2f + Mathf.Sin(v * 5.9f + u * 4.3f + tier) * .8f
+                        + Mathf.Sin(v * 3.7f + u * 2.9f + tier) * .25f;
+                    sheet[row, col] = new Vector3(x, y, z + bow + curl + sway + Mathf.Sin(u * 3.1f + v * 2.2f) * .4f);
                     float edge = 1f - Mathf.Abs(u - .5f) * 2f;
                     shade[row, col] = new Color(Mathf.Pow(v, .8f), Mathf.Clamp01(edge * 1.35f), 0f, 1f);
                 }

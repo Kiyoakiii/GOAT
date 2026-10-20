@@ -29,21 +29,21 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Contact: 0.4
-    - _Dither: 0.5
-    - _Flute: 0.3
+    - _Contact: 0.3
+    - _Dither: 0.62
+    - _Flute: 0.08
     - _GrassAmount: 0.05
     - _GrassSlope: 0.7
     - _GrassSlopeBlend: 0.2
     - _HazeAmount: 0.78
-    - _HazeEnd: 1500
-    - _HazeStart: 300
-    - _Layers: 0.06
-    - _Tiling: 0.1
+    - _HazeEnd: 7500
+    - _HazeStart: 1500
+    - _Layers: 0.05
+    - _Tiling: 0.02
     m_Colors:
-    - _GrassKhaki: {r: 0.39, g: 0.41, b: 0.28, a: 1}
-    - _GrassMid: {r: 0.29, g: 0.38, b: 0.22, a: 1}
-    - _GrassTint: {r: 0.22, g: 0.32, b: 0.2, a: 1}
+    - _GrassKhaki: {r: 0.4, g: 0.41, b: 0.27, a: 1}
+    - _GrassMid: {r: 0.31, g: 0.37, b: 0.21, a: 1}
+    - _GrassTint: {r: 0.24, g: 0.31, b: 0.19, a: 1}
     - _HazeTint: {r: 0.72, g: 0.8, b: 0.8, a: 1}
     - _OliveTint: {r: 0.42, g: 0.43, b: 0.33, a: 1}
     - _RockTint: {r: 1.02, g: 0.98, b: 0.92, a: 1}

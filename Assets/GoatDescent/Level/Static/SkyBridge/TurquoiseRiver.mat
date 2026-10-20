@@ -26,16 +26,16 @@ Material:
     m_Ints: []
     m_Floats:
     - _FlowSpeed: 0.8
-    - _HazeEnd: 2600
-    - _HazeStart: 700
-    - _HazeStrength: 0.5
-    - _Opacity: 0.84
-    - _Smoothness: 0.9
+    - _HazeEnd: 16000
+    - _HazeStart: 5000
+    - _HazeStrength: 0.15
+    - _Opacity: 0.95
+    - _Smoothness: 0.45
     - _WaveScale: 0.22
     m_Colors:
-    - _Deep: {r: 0.04, g: 0.32, b: 0.36, a: 1}
-    - _Foam: {r: 0.94, g: 0.99, b: 1, a: 1}
-    - _HazeColor: {r: 0.53, g: 0.74, b: 0.91, a: 1}
-    - _Shallow: {r: 0.15, g: 0.66, b: 0.62, a: 1}
+    - _Deep: {r: 0.015, g: 0.26, b: 0.3, a: 1}
+    - _Foam: {r: 0.78, g: 0.95, b: 0.94, a: 1}
+    - _HazeColor: {r: 0.46, g: 0.58, b: 0.72, a: 1}
+    - _Shallow: {r: 0.06, g: 0.62, b: 0.58, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

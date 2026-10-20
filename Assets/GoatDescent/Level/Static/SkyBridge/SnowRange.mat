@@ -29,19 +29,23 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Grass: 0.75
-    - _GreenLine: 330
-    - _HazeEnd: 2600
-    - _HazeStart: 700
-    - _HazeStrength: 0.8
+    - _Detail: 1
+    - _Grass: 0.05
+    - _GreenLine: -100000
+    - _HazeEnd: 15000
+    - _HazeStart: 3800
+    - _HazeStrength: 0.45
     - _Layers: 0.1
     - _Occlusion: 0
+    - _ShadowFloor: 0.35
     - _SnowLine: 300
+    - _TexAmount: 1
     - _Tiling: 0.02
     m_Colors:
-    - _GrassTint: {r: 0.14, g: 0.3, b: 0.16, a: 1}
-    - _HazeColor: {r: 0.53, g: 0.74, b: 0.91, a: 1}
-    - _RockTint: {r: 0.6, g: 0.66, b: 0.76, a: 1}
-    - _SnowTint: {r: 0.97, g: 0.99, b: 1, a: 1}
+    - _FillTint: {r: 0.36, g: 0.42, b: 0.38, a: 1}
+    - _GrassTint: {r: 0.16, g: 0.24, b: 0.17, a: 1}
+    - _HazeColor: {r: 0.44, g: 0.56, b: 0.7, a: 1}
+    - _RockTint: {r: 0.95, g: 1, b: 1.08, a: 1}
+    - _SnowTint: {r: 0.8, g: 0.85, b: 0.92, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

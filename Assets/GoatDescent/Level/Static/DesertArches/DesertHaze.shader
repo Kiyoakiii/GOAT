@@ -4,6 +4,7 @@ Shader "GoatDescent/DesertHaze"
     {
         _HazeColor ("Haze Color", Color) = (.96, .89, .78, 1)
         _Strength ("Strength", Range(0, 1)) = .5
+        _DistanceScale ("Distance scale", Float) = 1
     }
     SubShader
     {
@@ -30,6 +31,7 @@ Shader "GoatDescent/DesertHaze"
             };
             fixed4 _HazeColor;
             float _Strength;
+            float _DistanceScale;
             v2f vert(appdata v)
             {
                 v2f o;
@@ -40,8 +42,9 @@ Shader "GoatDescent/DesertHaze"
             }
             fixed4 frag(v2f i) : SV_Target
             {
-                float near = saturate((i.depth - 40.0) / 200.0);
-                float far = saturate(1.0 - (i.depth - 700.0) / 1000.0);
+                float span = i.depth / max(.001, _DistanceScale);
+                float near = saturate((span - 40.0) / 200.0);
+                float far = saturate(1.0 - (span - 700.0) / 1000.0);
                 return fixed4(_HazeColor.rgb, saturate(i.color.a * _Strength * near * far));
             }
             ENDCG

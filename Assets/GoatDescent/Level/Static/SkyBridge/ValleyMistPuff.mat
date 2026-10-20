@@ -26,9 +26,9 @@ Material:
     m_Ints: []
     m_Floats:
     - _NoiseScale: 0.035
-    - _Opacity: 0.5
+    - _Opacity: 0.28
     m_Colors:
-    - _Color: {r: 0.93, g: 0.96, b: 0.97, a: 1}
-    - _Shadow: {r: 0.62, g: 0.7, b: 0.74, a: 1}
+    - _Color: {r: 0.84, g: 0.9, b: 0.94, a: 1}
+    - _Shadow: {r: 0.52, g: 0.62, b: 0.7, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

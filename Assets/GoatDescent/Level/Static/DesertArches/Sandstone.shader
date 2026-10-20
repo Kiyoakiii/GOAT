@@ -57,10 +57,17 @@ Shader "GoatDescent/DesertSandstone"
             return lerp(lerp(Hash(c), Hash(c + float2(1, 0)), t.x),
                 lerp(Hash(c + float2(0, 1)), Hash(c + 1), t.x), t.y);
         }
+        float DuneSand(float2 p)
+        {
+            return .54 + (Noise(p * .009 + 4.7) - .5) * .13
+                + (Noise(p * .031 + 9.3) - .5) * .06
+                + (Noise(p * .093 + 21.1) - .5) * .022;
+        }
         void surf(Input IN, inout SurfaceOutputStandard o)
         {
             float3 w = IN.worldPos;
             float3 n = normalize(IN.worldNormal);
+            float cameraDistance = length(_WorldSpaceCameraPos - w);
             float cs = cos(_Swirl.x);
             float sn = sin(_Swirl.x);
             float3 p = float3(w.x * cs - w.z * sn, w.y, w.x * sn + w.z * cs);
@@ -69,9 +76,15 @@ Shader "GoatDescent/DesertSandstone"
             p += _Swirl.yzw;
             float3 weights = pow(abs(n), 4);
             weights /= max(.001, weights.x + weights.y + weights.z);
-            float3 tex = tex2D(_RockTex, p.zy * _Tiling).rgb * weights.x
-                + tex2D(_RockTex, p.xz * _Tiling).rgb * weights.y
-                + tex2D(_RockTex, p.xy * _Tiling).rgb * weights.z;
+            float3 tex = tex2D(_RockTex, p.zy * _Tiling * float2(.87, 1.13)).rgb * weights.x
+                + tex2D(_RockTex, p.xz * _Tiling * float2(1.09, .81)).rgb * weights.y
+                + tex2D(_RockTex, p.xy * _Tiling * float2(.93, 1.07)).rgb * weights.z;
+            float footprint = max(max(fwidth(w.x), fwidth(w.y)), fwidth(w.z));
+            float aa = saturate(1 - footprint * 3.2);
+            float flatMask = smoothstep(.5, .92, n.y);
+            float flatWash = flatMask * saturate((cameraDistance - 55) / 320);
+            float flatLum = dot(tex, float3(.3, .59, .11)) * (1 + (DuneSand(p.xz) - .54) * 1.7);
+            tex = lerp(tex, flatLum.xxx, flatWash * .95);
             float macro = Noise(p.xz * .017 + p.y * .009) * .55 + Noise(p.zy * .021 + p.x * .012) * .45;
             float phase = p.y * _StrataScale
                 + Noise(p.xz * .019 + p.y * .004) * 2
@@ -81,19 +94,30 @@ Shader "GoatDescent/DesertSandstone"
             float layer = smoothstep(.05, .95, band);
             float coarse = 1 - abs(frac(phase * .37 + Noise(p.zy * .006 + 3.3) * .6) - .5) * 2;
             coarse = smoothstep(.12, .95, coarse);
-            float grain = Noise(p.xz * .33 + p.y * .17) * .5 + Noise(p.zy * .37 + p.x * .21) * .5;
-            float flake = Noise(p.xy * .9 + p.z * .6) * .5 + Noise(p.zy * 1.1 + p.x * .7) * .5;
+            float grain = Noise(p.xz * float2(.012, .010) + p.y * .0075 + 2.7) * .5
+                + Noise(p.zy * float2(.011, .0135) + p.x * .0085 + 9.1) * .5;
+            float flake = Noise(p.xy * float2(.023, .027) + p.z * .018 + 5.3) * .5
+                + Noise(p.zy * float2(.030, .025) + p.x * .020 + 12.9) * .5;
+            float fine = saturate(1 - cameraDistance / 380);
+            float flakeFine = saturate(1 - cameraDistance / 240);
             float top = smoothstep(.6, .96, n.y);
+            float slopeMask = (1 - top) * (1 - top);
+            float flats = smoothstep(.62, .95, n.y);
+            float speck = Noise(p.xz * .43 + p.y * .37 + 3.1) * .6 + Noise(p.zy * .31 + p.x * .45 + 7.9) * .4;
+            float texLum = dot(tex, float3(.3, .59, .11));
+            tex = lerp(tex, lerp(tex, texLum.xxx * 1.02, .45), flats * .6);
+            tex = lerp(texLum.xxx * 1.02, tex, lerp(.35, 1, saturate(1 - cameraDistance / 1200)));
             float3 tint = lerp(_RockTint.rgb, _SandTint.rgb, top * _Dust);
-            tint = lerp(tint, _SeamTint.rgb, (1 - layer) * _Layers * (1 - top) * .3);
-            tint = lerp(tint, _SandTint.rgb, (1 - coarse) * _Layers * (1 - top) * .22);
+            tint = lerp(tint, _SeamTint.rgb, (1 - layer) * _Layers * slopeMask * .3);
+            tint = lerp(tint, _SandTint.rgb, (1 - coarse) * _Layers * slopeMask * .22);
             float varnish = smoothstep(.35, 1.0,
                 Noise(float2(p.x * .11 + p.y * .05, p.z * .11)) * .72
                 + Noise(float2(p.x * .021, p.y * .028 + p.z * .021)) * .45);
             tint = lerp(tint, _VarnishTint.rgb, varnish * (1 - top) * _Varnish * .75 * smoothstep(.02, .45, 1 - n.y));
             tint = lerp(tint, _MidTint.rgb, (1 - top) * _Mid);
             float3 base = lerp(tex, dot(tex, float3(.3, .59, .11)).xxx, .58) * tint
-                * (lerp(.84, 1.1, macro) * lerp(.94, 1.06, grain) * lerp(.97, 1.03, flake));
+                * (lerp(.84, 1.1, macro) * lerp(1.0, lerp(.962, 1.038, grain), .65 * fine) * lerp(1.0, lerp(.99, 1.01, flake), .45 * flakeFine)
+                * lerp(1.0, lerp(.94, 1.06, speck), flats * .9 * aa * (1 - flatWash * .8)));
             float depth = saturate((w.y - _DepthFloor) / _DepthSpan);
             float contact = (1 - saturate(IN.color.b)) * (1 - n.y * n.y);
             float ao = saturate(IN.color.r) * lerp(1 - _DepthShade, 1, depth);
@@ -102,7 +126,8 @@ Shader "GoatDescent/DesertSandstone"
             ao = saturate(ao + (1 - ao) * under * .6);
             float playa = saturate(1 - abs(w.y - _PlayaY) / _PlayaSpan) * smoothstep(.72, .96, n.y) * _Playa;
             base = lerp(base, _PlayaTint.rgb * base * 1.6, playa);
-            float distance = length(_WorldSpaceCameraPos - w);
+            base *= saturate(IN.color.g);
+            float distance = cameraDistance;
             float haze = saturate((distance - _HazeStart) / max(1, _HazeEnd - _HazeStart)) * _HazeStrength;
             float3 hazeColor = lerp(_HazeTint.rgb, dot(_HazeTint.rgb, float3(.3, .59, .11)).xxx, _HazeDesat);
             o.Albedo = lerp(lerp(base, base * _ShadeTint.rgb * 2.1, (1 - ao) * .8), hazeColor, haze);

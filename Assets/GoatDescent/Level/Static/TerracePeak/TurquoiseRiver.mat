@@ -25,7 +25,7 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _Haze: 0.85
+    - _Haze: 0
     m_Colors:
     - _Deep: {r: 0.06, g: 0.32, b: 0.42, a: 1}
     - _Foam: {r: 0.72, g: 0.86, b: 0.86, a: 1}
