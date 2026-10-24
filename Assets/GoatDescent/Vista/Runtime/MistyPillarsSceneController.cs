@@ -23,12 +23,20 @@ namespace GoatDescent.ProceduralWorld
 
         private readonly List<Object> runtimeAssets = new List<Object>();
         private Transform spawnMarker;
+        private bool retainSpawnMeshData;
 
         public bool GenerateOnStart => generateOnStart;
         public int TowerCount => towerCount;
         public Transform SpawnMarker => spawnMarker;
 
         public void SetGenerateOnStart(bool value) => generateOnStart = value;
+        public void SetSpawnGoat(bool value) => spawnGoat = value;
+        public void SetRetainSpawnMeshData(bool value) => retainSpawnMeshData=value;
+        public void ReleaseSpawnMeshData()
+        {
+            foreach(Object asset in runtimeAssets)
+                if(asset is Mesh mesh && mesh.isReadable) mesh.UploadMeshData(true);
+        }
 
         public void ConfigureDefaultLayout()
         {
@@ -99,15 +107,18 @@ namespace GoatDescent.ProceduralWorld
             if (bark.HasProperty("_RimStrength")) bark.SetFloat("_RimStrength", .12f);
             runtimeAssets.Add(rock); runtimeAssets.Add(foliage); runtimeAssets.Add(bark);
 
-            var sink = new RuntimeMeshSink(runtimeAssets);
+            var sink = new RuntimeMeshSink(runtimeAssets,retainSpawnMeshData);
             foreach (var spec in MistyPillarsVistaBuilder.BuildLayout(towerCount, randomSeed, heightMin, heightMax, radiusMin, radiusMax))
             {
                 var marker = MistyPillarsVistaBuilder.CreateTower(root.transform, spec, rock, foliage, bark, sink, false);
                 if (marker) spawnMarker = marker;
             }
 #if UNITY_EDITOR
-            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(gameObject.scene);
-            UnityEditor.SceneView.RepaintAll();
+            if(!Application.isPlaying)
+            {
+                UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(gameObject.scene);
+                UnityEditor.SceneView.RepaintAll();
+            }
 #endif
         }
 
@@ -120,7 +131,7 @@ namespace GoatDescent.ProceduralWorld
             DestroyRuntimeAssets();
             spawnMarker = null;
 #if UNITY_EDITOR
-            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(gameObject.scene);
+            if(!Application.isPlaying) UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(gameObject.scene);
 #endif
         }
 

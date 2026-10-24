@@ -9,6 +9,7 @@ namespace GoatDescent.EditorTools
         public static void Inspect()
         {
             string path = "Assets/GoatDescent/Vista/Scenes/ProceduralWorldMilestone.unity";
+            if (!System.IO.File.Exists(path)) throw new System.InvalidOperationException("This inspection targets the retired milestone scene. Runtime players are now created by GoatPlayground.");
             var scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
             var spawner = Object.FindFirstObjectByType<GoatSpawner>();
             var marker = GameObject.Find("Pillar Goat Spawn");

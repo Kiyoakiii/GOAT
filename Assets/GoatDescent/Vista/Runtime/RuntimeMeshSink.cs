@@ -6,8 +6,10 @@ namespace GoatDescent.ProceduralWorld
     public sealed class RuntimeMeshSink : MistyPillarsVistaBuilder.IMeshSink
     {
         private readonly List<Object> assets;
+        private readonly bool retainSpawnMeshData;
 
-        public RuntimeMeshSink(List<Object> assetTracker) { assets = assetTracker; }
+        public RuntimeMeshSink(List<Object> assetTracker,bool retainSpawnGeometry=false)
+        { assets=assetTracker;retainSpawnMeshData=retainSpawnGeometry; }
 
         public GameObject Emit(Transform parent, string objectName, string assetName, PillarMeshBuilder builder, Material material, bool flatten)
         {
@@ -19,7 +21,8 @@ namespace GoatDescent.ProceduralWorld
             mesh.SetTriangles(builder.triangles, 0);
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
-            mesh.UploadMeshData(true);
+            bool retain=retainSpawnMeshData && parent.name=="Forest pillar "+MistyPillarsVistaBuilder.SpawnTowerSeed;
+            mesh.UploadMeshData(!retain);
             assets.Add(mesh);
             var obj = new GameObject(objectName);
             obj.transform.SetParent(parent, false);

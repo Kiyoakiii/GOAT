@@ -21,6 +21,14 @@ namespace GoatDescent.Editor
                 options = BuildOptions.None
             });
             bool success = report.summary.result == BuildResult.Succeeded;
+            if (success)
+            {
+                string textures = Path.Combine(Application.dataPath, "GoatDescent", "Textures");
+                string outputTextures = Path.Combine(folder, "GoatDescent_Data", "GoatDescent", "Textures");
+                Directory.CreateDirectory(outputTextures);
+                foreach (string texture in Directory.GetFiles(textures, "*.jpg"))
+                    File.Copy(texture, Path.Combine(outputTextures, Path.GetFileName(texture)), true);
+            }
             Debug.Log($"MOUNTAIN_DUO_BUILD result={report.summary.result} output={folder} bytes={report.summary.totalSize}");
             if (Application.isBatchMode) EditorApplication.Exit(success ? 0 : 1);
         }

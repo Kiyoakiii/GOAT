@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace GoatDescent
@@ -6,7 +7,7 @@ namespace GoatDescent
     [DefaultExecutionOrder(150)]
     public sealed class SkyPredatorEpisode : MonoBehaviour
     {
-        private enum FlightPhase : byte { Circling, Approaching, Diving, Struggling, Looping, Carrying, Returning }
+        private enum FlightPhase : byte { Circling, Approaching, Diving, Struggling, Looping, Carrying, Returning, KnockedBack, Inspecting }
 
         private sealed class Bird
         {
@@ -16,7 +17,12 @@ namespace GoatDescent
             public Transform RightWing;
             public Vector3 SnapshotPosition;
             public Quaternion SnapshotRotation;
+            public bool ImpactVisible;
+            public Vector3 PatrolCenter, PatrolOutward;
+            public bool OrbitPlaced;
         }
+
+        private sealed class HuntAttention { public int Started, WaitingRolls; }
 
         public static SkyPredatorEpisode Current { get; private set; }
         public string AlertText
@@ -33,6 +39,8 @@ namespace GoatDescent
                         return $"{hunter} ТЯНЕТ {targetId}, НО НАПАРНИК ДЕРЖИТ F! {seconds:0.0} с";
                     case FlightPhase.Looping: return $"{hunter} ОТПУСТИЛ КОЗЛА {targetId} И ДЕЛАЕТ НОВЫЙ КРУГ!";
                     case FlightPhase.Carrying: return $"{hunter} УНОСИТ КОЗЛА {targetId} В НЕБО!";
+                    case FlightPhase.KnockedBack: return $"{hunter} ПОЛУЧИЛ КОПЫТОМ — ПЕРЬЯ ЛЕТЯТ!";
+                    case FlightPhase.Inspecting: return $"{hunter} ПРОВЕРЯЕТ КОЗЛА {targetId} — НЕ ШЕВЕЛИСЬ!";
                     case FlightPhase.Returning: return $"{hunter} ВОЗВРАЩАЕТСЯ К СТАЕ";
                     default: return "";
                 }
@@ -47,12 +55,15 @@ namespace GoatDescent
         private const float FlightTurnSpeed = 540f;
         private const int MaximumAttempts = 3;
         private const float HuntRollInterval = 30f;
-        private const float HuntChance = .1f;
         private readonly Bird[] birds = new Bird[5];
-        private readonly Material[] materials = new Material[3];
+        private readonly Material[] materials = new Material[7];
+        private readonly List<GoatController> huntCandidates=new List<GoatController>();
+        private readonly Dictionary<GoatController,HuntAttention> huntAttention=new Dictionary<GoatController,HuntAttention>();
+        private static readonly RaycastHit[] flightHits=new RaycastHit[64];
+        private static readonly float[] attackAngles={0f,30f,-30f,60f,-60f};
         private bool initialized;
         private float summitHeight;
-        private Vector3 center, outward, sideways;
+        private Vector3 center, outward, pillarOrigin;
         private FlightPhase phase;
         private GoatController target, carried;
         private Rigidbody carryAnchorBody;
@@ -63,12 +74,18 @@ namespace GoatDescent
         private float phaseStarted, phaseUntil, nextHuntRollAt, networkSecondsLeft;
         private float flightCeilingY, loopStartAngle;
         private Vector3 attackOutward, diveStart, carryStart, carryEnd;
+        private Vector3 recoilStart, recoilDirection;
+        private Quaternion recoilRotation;
+        private Vector3 inspectionPoint;
+        private bool inspectionLanded;
+        private const float RecoilDuration = 1.65f;
 
         private void Awake() => Current = this;
 
         private void Update()
         {
-            if (!MountainAuthority.IsHost || !Input.GetKeyDown(KeyCode.F12)) return;
+            if (GoatSkinMenu.IsOpen || GoatSettingsMenu.BlocksInput
+                || !MountainAuthority.IsHost || !Input.GetKeyDown(KeyCode.F12)) return;
             var pair = LocalGoatPair.Instance;
             if (pair && pair.Active && (!pair.NetworkMode || pair.Active == pair.Primary))
                 ForceAttack(pair.Active);
@@ -78,11 +95,13 @@ namespace GoatDescent
         public bool ForceAttack(GoatController goat)
         {
             if (!MountainAuthority.IsHost || !initialized || birds[0] == null || !goat
-                || phase == FlightPhase.Carrying) return false;
+                || phase == FlightPhase.Carrying || phase == FlightPhase.KnockedBack) return false;
             var interaction = goat.GetComponent<GoatInteraction>();
             if (interaction && interaction.IsHolding && interaction.Partner)
                 goat = interaction.Partner.GetComponent<GoatController>();
             if (!ValidTarget(goat)) return false;
+            if (goat.GetComponent<GoatComedyActions>()?.PlayingDead == true)
+            { ObservePretence(goat); return true; }
             if (phase == FlightPhase.Circling)
                 activeBirdIndex = ClosestBirdTo(goat.transform.position);
             BeginHunt(goat, activeBirdIndex, true, Time.time);
@@ -90,17 +109,22 @@ namespace GoatDescent
             return true;
         }
 
-        public void Initialize(Vector3 flockCenter, Vector3 outwardDirection, float summitY)
+        public void Initialize(Vector3 flockCenter, Vector3 outwardDirection, float summitY,Transform pillar=null)
         {
             initialized = true;
             center = flockCenter;
             summitHeight = summitY;
+            pillarOrigin=pillar ? pillar.position : transform.parent ? transform.parent.position : Vector3.zero;
             outward = Vector3.ProjectOnPlane(outwardDirection, Vector3.up).normalized;
             if (outward.sqrMagnitude < .01f) outward = Vector3.forward;
-            sideways = Vector3.Cross(Vector3.up, outward);
             materials[0] = MakeMaterial("Predator feathers", new Color(.19f, .12f, .09f));
             materials[1] = MakeMaterial("Predator wing tips", new Color(.08f, .075f, .07f));
             materials[2] = MakeMaterial("Predator beak", new Color(.96f, .65f, .17f));
+            materials[3] = MakeMaterial("Predator ivory plumage", new Color(.94f, .9f, .74f));
+            materials[4] = MakeMaterial("Predator eye whites", Color.white);
+            materials[5] = MakeMaterial("Predator warm feather edges", new Color(.38f, .23f, .13f));
+            materials[6] = new Material(Resources.Load<Shader>("EaglePlumage"))
+                { name = "Blender eagle vertex plumage", color = Color.white };
             for (int i = 0; i < birds.Length; i++) birds[i] = CreateBird(i);
             nextHuntRollAt = Time.time + HuntRollInterval;
             UpdateOrbit(Time.time);
@@ -116,63 +140,26 @@ namespace GoatDescent
         {
             var root = new GameObject($"SKY-{index + 1:00} bird");
             root.transform.SetParent(transform);
-            var bird = new Bird { Id = $"SKY-{index + 1:00}", Root = root.transform };
-            AddPart(root.transform, "Body", PrimitiveType.Capsule, new Vector3(0f, 0f, 0f),
-                new Vector3(.52f, .82f, .46f), Quaternion.Euler(90f, 0f, 0f), materials[0]);
-            AddPart(root.transform, "Head", PrimitiveType.Sphere, new Vector3(0f, .12f, .64f),
-                Vector3.one * .48f, Quaternion.identity, materials[0]);
-            AddPart(root.transform, "Beak", PrimitiveType.Cube, new Vector3(0f, .02f, 1.01f),
-                new Vector3(.19f, .15f, .4f), Quaternion.Euler(15f, 0f, 0f), materials[2]);
-            AddPart(root.transform, "Tail", PrimitiveType.Cube, new Vector3(0f, -.06f, -1.0f),
-                new Vector3(.75f, .08f, .72f), Quaternion.Euler(-12f, 0f, 0f), materials[1]);
-            for (int side = -1; side <= 1; side += 2)
-            {
-                var pivot = new GameObject(side < 0 ? "Left wing" : "Right wing");
-                pivot.transform.SetParent(root.transform, false);
-                pivot.transform.localPosition = new Vector3(side * .28f, .13f, .05f);
-                AddPart(pivot.transform, "Wing", PrimitiveType.Cube,
-                    new Vector3(side * 1.0f, 0f, -.13f), new Vector3(1.95f, .09f, .68f),
-                    Quaternion.identity, materials[0]);
-                AddPart(pivot.transform, "Flight feathers", PrimitiveType.Cube,
-                    new Vector3(side * 1.9f, -.02f, -.35f), new Vector3(.9f, .06f, .45f),
-                    Quaternion.Euler(0f, side * 13f, 0f), materials[1]);
-                AddPart(root.transform, side < 0 ? "Left eye" : "Right eye", PrimitiveType.Sphere,
-                    new Vector3(side * .2f, .18f, .8f), Vector3.one * .09f,
-                    Quaternion.identity, materials[2]);
-                AddPart(root.transform, side < 0 ? "Left talon" : "Right talon", PrimitiveType.Cube,
-                    new Vector3(side * .27f, -.48f, .36f), new Vector3(.13f, .84f, .16f),
-                    Quaternion.Euler(14f, 0f, side * 9f), materials[2]);
-                if (side < 0) bird.LeftWing = pivot.transform;
-                else bird.RightWing = pivot.transform;
-            }
+            var bird = new Bird { Id = $"SKY-{index + 1:00}", Root = root.transform,
+                PatrolCenter=center,PatrolOutward=outward };
+            CartoonEagleVisual.Build(root.transform, materials, index, out bird.LeftWing, out bird.RightWing);
             return bird;
-        }
-
-        private static void AddPart(Transform parent, string name, PrimitiveType shape,
-            Vector3 position, Vector3 scale, Quaternion rotation, Material material)
-        {
-            var part = GameObject.CreatePrimitive(shape);
-            part.name = name;
-            part.transform.SetParent(parent, false);
-            part.transform.localPosition = position;
-            part.transform.localRotation = rotation;
-            part.transform.localScale = scale;
-            part.GetComponent<Renderer>().sharedMaterial = material;
-            var collider = part.GetComponent<Collider>();
-            collider.enabled = false;
-            Destroy(collider);
         }
 
         private void FixedUpdate()
         {
             if (!initialized || birds[0] == null || !MountainAuthority.IsHost) return;
             float now = Time.time;
+            UpdatePatrol();
             if (now >= nextHuntRollAt)
             {
                 nextHuntRollAt = now + HuntRollInterval;
                 RollForHunt(now);
             }
             UpdateOrbit(now);
+            if (target && target.GetComponent<GoatComedyActions>()?.PlayingDead == true
+                && (phase == FlightPhase.Approaching || phase == FlightPhase.Diving || phase == FlightPhase.Looping))
+                BeginInspection(target, activeBirdIndex, now);
             switch (phase)
             {
                 case FlightPhase.Circling:
@@ -248,6 +235,12 @@ namespace GoatDescent
                     if (carryAnchorBody) carryAnchorBody.MovePosition(carryPoint);
                     if (carryT >= 1f) ReleaseGoat(carried, true);
                     break;
+                case FlightPhase.KnockedBack:
+                    AdvanceRecoil(now);
+                    break;
+                case FlightPhase.Inspecting:
+                    AdvanceInspection(now);
+                    break;
                 case FlightPhase.Returning:
                     AdvanceReturn(now);
                     break;
@@ -262,15 +255,71 @@ namespace GoatDescent
             manualAttack = forced;
             attemptNumber = 0;
             attackOutward = OutwardFromPillar(goat.transform.position);
+            if(TryFindAttackLane(goat,out var launchPoint,out var laneOutward)) attackOutward=laneOutward;
+            else launchPoint=goat.transform.position+attackOutward*7f+Vector3.up*8f;
             flightCeilingY = Mathf.Max(summitHeight + 14f, goat.transform.position.y + 11f,
                 birds[birdIndex].Root.position.y + 6f);
-            bool nearbyFace = Vector3.Dot(outward, attackOutward) > .5f
-                && Mathf.Abs(goat.transform.position.y - center.y) < 20f;
-            approachStage = nearbyFace ? 2 : 0;
+            // A bird already patrolling this goat can approach at its current
+            // altitude. Only an obstructed transfer takes the route above the summit.
+            approachStage=ClearFlightPath(birds[birdIndex].Root.position,launchPoint) ? 2 : 0;
             phase = FlightPhase.Approaching;
             phaseStarted = now;
             phaseUntil = 0f;
             Debug.Log($"SKY_PREDATOR_HUNT_BEGIN bird={birds[birdIndex].Id} target={targetId} forced={forced}");
+        }
+
+        public void ObservePretence(GoatController goat)
+        {
+            if (!MountainAuthority.IsHost || !initialized || !goat || carried
+                || phase == FlightPhase.KnockedBack || !ValidTarget(goat)) return;
+            if (phase != FlightPhase.Circling && phase != FlightPhase.Returning && target != goat) return;
+            int index = target == goat ? activeBirdIndex : ClosestBirdTo(goat.transform.position);
+            BeginInspection(goat,index,Time.time);
+        }
+        public bool IsInspecting(GoatController goat) => phase == FlightPhase.Inspecting && target == goat;
+
+        private void BeginInspection(GoatController goat, int index, float now)
+        {
+            target=goat; targetId=GoatId(goat); activeBirdIndex=index;
+            phase=FlightPhase.Inspecting; phaseStarted=now; phaseUntil=now+15f;
+            inspectionLanded=false; manualAttack=false;
+            attackOutward=OutwardFromPillar(goat.transform.position);
+            inspectionPoint=goat.transform.position+attackOutward*1.9f+Vector3.up*1.3f;
+            // Prefer a real patch of ground for the bird's feet. At a cliff edge it hovers instead.
+            float nearest=float.PositiveInfinity;
+            foreach (var hit in Physics.RaycastAll(inspectionPoint+Vector3.up*2f,Vector3.down,5f,~0,QueryTriggerInteraction.Ignore))
+            {
+                if (hit.collider.GetComponentInParent<GoatController>() || hit.collider.GetComponentInParent<GoatPhysicsPart>()
+                    || hit.normal.y<.6f || hit.distance>=nearest) continue;
+                nearest=hit.distance; inspectionPoint=hit.point+Vector3.up*.68f;
+            }
+            Debug.Log("EAGLE_INSPECTION_BEGIN target="+targetId);
+        }
+
+        private void AdvanceInspection(float now)
+        {
+            if (!target || target.GetComponent<RespawnController>()?.IsDead==true) { BeginReturn(now); return; }
+            var comedy=target.GetComponent<GoatComedyActions>();
+            if (!comedy || !comedy.PlayingDead) { ExposePretence(target); return; }
+            if (!inspectionLanded)
+            {
+                if (FlyToward(inspectionPoint,FlightSpeed*.6f))
+                { inspectionLanded=true; phaseUntil=now+2.8f; }
+                else if (now>=phaseUntil) BeginReturn(now);
+                return;
+            }
+            Vector3 direction=target.transform.position+Vector3.up*.7f-inspectionPoint;
+            SetBirdPose(activeBirdIndex,inspectionPoint,direction);
+            if (now>=phaseUntil) { comedy.FooledEagle(); BeginReturn(now); }
+        }
+
+        public void ExposePretence(GoatController goat)
+        {
+            if (!MountainAuthority.IsHost || phase!=FlightPhase.Inspecting || target!=goat) return;
+            // Attack from the bird's actual checking position; never teleport above the goat.
+            phase=FlightPhase.Diving; phaseStarted=Time.time; phaseUntil=Time.time+DiveDuration;
+            diveStart=birds[activeBirdIndex].Root.position; manualAttack=true; attemptNumber=1;
+            Debug.Log("EAGLE_PRETENCE_EXPOSED target="+targetId);
         }
 
         private bool CanContinueHunt()
@@ -279,7 +328,8 @@ namespace GoatDescent
         private void AdvanceApproach(float now)
         {
             var bird = birds[activeBirdIndex];
-            Vector3 launchPoint = target.transform.position + attackOutward * 7f + Vector3.up * 8f;
+            if(TryFindAttackLane(target,out var launchPoint,out var laneOutward)) attackOutward=laneOutward;
+            else launchPoint=target.transform.position+attackOutward*7f+Vector3.up*8f;
             if (approachStage == 0)
             {
                 Vector3 climbPoint = new Vector3(bird.Root.position.x, flightCeilingY, bird.Root.position.z);
@@ -338,7 +388,7 @@ namespace GoatDescent
             phase = FlightPhase.Returning;
             phaseStarted = now;
             phaseUntil = 0f;
-            returnStage = 0;
+            returnStage=ClearFlightPath(birds[activeBirdIndex].Root.position,OrbitPoint(activeBirdIndex,now)) ? 2 : 0;
             target = null;
             targetId = "";
             manualAttack = false;
@@ -382,7 +432,7 @@ namespace GoatDescent
 
         private Vector3 OutwardFromPillar(Vector3 position)
         {
-            Vector3 radial = transform.parent ? position - transform.parent.position : outward;
+            Vector3 radial = position-pillarOrigin;
             radial.y = 0f;
             return radial.sqrMagnitude > .1f ? radial.normalized : outward;
         }
@@ -394,49 +444,177 @@ namespace GoatDescent
                 Debug.Log("SKY_PREDATOR_ROLL hunt=false reason=bird_busy");
                 return;
             }
-            float roll = Random.value;
-            if (roll >= HuntChance)
-            {
-                Debug.Log($"SKY_PREDATOR_ROLL chance=0.10 value={roll:0.000} hunt=false");
-                return;
-            }
-            activeBirdIndex = Random.Range(0, birds.Length);
-            GoatController candidate = FindExposedTarget(birds[activeBirdIndex].Root.position);
+            CollectHuntCandidates();
+            foreach(var entry in huntAttention)
+                if(!huntCandidates.Contains(entry.Key)) entry.Value.WaitingRolls=0;
+            foreach(var goat in huntCandidates) AttentionFor(goat).WaitingRolls++;
+            GoatController candidate = FindExposedTarget();
             if (!candidate)
             {
-                Debug.Log($"SKY_PREDATOR_ROLL chance=0.10 value={roll:0.000} hunt=false reason=no_exposed_goat");
+                Debug.Log("SKY_PREDATOR_ROLL hunt=false reason=no_exposed_goat");
                 return;
             }
-            BeginHunt(candidate, activeBirdIndex, false, now);
-            Debug.Log($"SKY_PREDATOR_ROLL chance=0.10 value={roll:0.000} hunt=true bird={birds[activeBirdIndex].Id} target={targetId}");
-        }
-
-        private GoatController FindExposedTarget(Vector3 birdPosition)
-        {
-            GoatController nearestGoat = null;
-            float nearestDistance = float.PositiveInfinity;
-            foreach (var goat in FindObjectsByType<GoatController>(FindObjectsSortMode.None))
+            var settings = GoatHerdSettings.Get();
+            bool lonely = candidate.GetComponent<GoatHerdBehaviour>()?.Isolated == true;
+            float chance = lonely ? settings.lonelyHuntChance : settings.normalHuntChance;
+            var attention=AttentionFor(candidate);
+            bool overdue=settings.maxHuntRollsWithoutAttack>0 && attention.WaitingRolls>=settings.maxHuntRollsWithoutAttack;
+            float roll = Random.value;
+            if (!overdue && roll >= chance)
             {
-                if (!Eligible(goat)) continue;
-                float distance = (goat.transform.position - birdPosition).sqrMagnitude;
-                if (distance < nearestDistance || (Mathf.Approximately(distance, nearestDistance)
-                    && string.CompareOrdinal(GoatId(goat), GoatId(nearestGoat)) < 0))
-                { nearestGoat = goat; nearestDistance = distance; }
+                Debug.Log($"SKY_PREDATOR_ROLL target={GoatId(candidate)} eligible={huntCandidates.Count} waiting={attention.WaitingRolls} chance={chance:0.00} value={roll:0.000} lonely={lonely} hunt=false");
+                return;
             }
-            return nearestGoat;
+            activeBirdIndex=ClosestBirdTo(candidate.transform.position);
+            attention.Started++;attention.WaitingRolls=0;
+            BeginHunt(candidate, activeBirdIndex, false, now);
+            Debug.Log($"SKY_PREDATOR_ROLL chance={chance:0.00} value={roll:0.000} lonely={lonely} overdue={overdue} hunt=true bird={birds[activeBirdIndex].Id} target={targetId}");
         }
 
-        private static bool Eligible(GoatController goat)
+        private HuntAttention AttentionFor(GoatController goat)
+        {
+            if(!huntAttention.TryGetValue(goat,out var attention))
+                huntAttention.Add(goat,attention=new HuntAttention());
+            return attention;
+        }
+
+        private void CollectHuntCandidates()
+        {
+            huntCandidates.Clear();
+            foreach (var goat in FindObjectsByType<GoatController>(FindObjectsSortMode.None))
+                if(Eligible(goat)) huntCandidates.Add(goat);
+            huntCandidates.Sort((a,b)=>string.CompareOrdinal(GoatId(a),GoatId(b)));
+        }
+
+        private GoatController FindExposedTarget()
+        {
+            var settings=GoatHerdSettings.Get();
+            int mostWaiting=0;
+            if(settings.maxHuntRollsWithoutAttack>0)
+                foreach(var goat in huntCandidates)
+                    mostWaiting=Mathf.Max(mostWaiting,AttentionFor(goat).WaitingRolls);
+            bool overdue=mostWaiting>=settings.maxHuntRollsWithoutAttack && settings.maxHuntRollsWithoutAttack>0;
+            GoatController chosen=null;
+            float leastAttention=float.PositiveInfinity,totalWeight=0;
+            foreach(var goat in huntCandidates)
+            {
+                var attention=AttentionFor(goat);
+                if(overdue && attention.WaitingRolls<mostWaiting) continue;
+                float weight=goat.GetComponent<GoatHerdBehaviour>()?.Isolated==true ? Mathf.Max(1,settings.lonelyTargetWeight) : 1;
+                // Equal isolation means equal attention, independent of distance
+                // from the summit or which goat owns the local camera.
+                float score=attention.Started/weight;
+                if(!chosen || score<leastAttention-.0001f)
+                {chosen=goat;leastAttention=score;totalWeight=weight;}
+                else if(Mathf.Abs(score-leastAttention)<.0001f)
+                {
+                    totalWeight+=weight;
+                    if(Random.value<weight/totalWeight) chosen=goat;
+                }
+            }
+            return chosen;
+        }
+
+        private bool Eligible(GoatController goat)
             => ValidTarget(goat) && IsExposed(goat);
 
         private static bool ValidTarget(GoatController goat)
             => goat && !goat.IsPredatorCarried
+                && goat.GetComponent<GoatDescentTricks>()?.BirdsAvoid != true
                 && goat.GetComponent<RespawnController>()?.IsDead != true;
 
-        private static bool IsExposed(GoatController goat)
+        public bool RepelNearby(GoatController goat, float range)
         {
+            if (!MountainAuthority.IsHost || !initialized || !goat) return false;
+            if (phase == FlightPhase.KnockedBack) return false;
+            int hitIndex = -1;
+            float nearest = range * range;
+            for (int i = 0; i < birds.Length; i++)
+            {
+                if (birds[i] == null) continue;
+                if (phase != FlightPhase.Circling && i != activeBirdIndex) continue;
+                float distance = (birds[i].Root.position - goat.transform.position - Vector3.up).sqrMagnitude;
+                if (distance >= nearest) continue;
+                nearest = distance; hitIndex = i;
+            }
+            if (hitIndex < 0) return false;
+            // A single hunting bird owns the carry joint: release before changing its index.
+            if (carried) ReleaseGoat(carried, false);
+            activeBirdIndex = hitIndex;
+            target = null; targetId = ""; manualAttack = false;
+            var struck = birds[hitIndex];
+            recoilStart = struck.Root.position;
+            recoilDirection = Vector3.ProjectOnPlane(recoilStart - goat.transform.position, Vector3.up).normalized;
+            if (recoilDirection.sqrMagnitude < .01f) recoilDirection = -goat.transform.forward;
+            recoilRotation = struck.Root.rotation;
+            phase = FlightPhase.KnockedBack;
+            phaseStarted = Time.time; phaseUntil = Time.time + RecoilDuration;
+            struck.ImpactVisible = true;
+            CartoonEagleVisual.ShedFeathers(struck.Root, materials[3]);
+            Debug.Log("EAGLE_ROUNDHOUSE_REPEL goat=" + goat.name);
+            return true;
+        }
+
+        private void AdvanceRecoil(float now)
+        {
+            float t = Mathf.Clamp01((now - phaseStarted) / RecoilDuration);
+            float retreat = 6f * (1f - Mathf.Exp(-9f * t));
+            float drop = -1.25f * Mathf.Sin(Mathf.Clamp01((t - .12f) / .88f) * Mathf.PI);
+            float pop = .65f * Mathf.Sin(Mathf.Clamp01(t / .25f) * Mathf.PI);
+            Vector3 destination = recoilStart + recoilDirection * retreat + Vector3.up * (drop + pop);
+            var bird = birds[activeBirdIndex];
+            Vector3 movement = destination - bird.Root.position;
+            // Stop at terrain before the recoil path enters a cliff or the floor.
+            if (movement.sqrMagnitude > .0001f)
+            {
+                float safeTravel = movement.magnitude;
+                foreach (var hit in Physics.SphereCastAll(bird.Root.position, .7f, movement.normalized,
+                    safeTravel, ~0, QueryTriggerInteraction.Ignore))
+                {
+                    if (hit.collider.GetComponentInParent<GoatController>()
+                        || hit.collider.GetComponentInParent<GoatPhysicsPart>()) continue;
+                    safeTravel = Mathf.Min(safeTravel, Mathf.Max(0f, hit.distance - .15f));
+                }
+                destination = bird.Root.position + movement.normalized * safeTravel;
+            }
+            float recover = Mathf.SmoothStep(0, 1, Mathf.Clamp01((t - .4f) / .6f));
+            Quaternion stunned = recoilRotation * Quaternion.Euler(-24f, 0, 35f);
+            bird.Root.SetPositionAndRotation(destination,
+                Quaternion.Slerp(stunned, Quaternion.LookRotation(recoilDirection + Vector3.up * .3f), recover));
+            bird.SnapshotPosition = bird.Root.position; bird.SnapshotRotation = bird.Root.rotation;
+            if (t >= 1f) { bird.ImpactVisible = false; BeginReturn(now); }
+        }
+
+        private bool IsExposed(GoatController goat)
+            => goat && TryFindAttackLane(goat,out _,out _);
+
+        private bool TryFindAttackLane(GoatController goat,out Vector3 launchPoint,out Vector3 direction)
+        {
+            launchPoint=direction=Vector3.zero;if(!goat) return false;
             Vector3 head = goat.transform.position + Vector3.up * 1.35f;
-            return ClearPath(head, head + Vector3.up * 14f);
+            Vector3 radial=OutwardFromPillar(goat.transform.position);
+            foreach(float angle in attackAngles)
+            {
+                Vector3 lane=Quaternion.AngleAxis(angle,Vector3.up)*radial;
+                Vector3 launch=goat.transform.position+lane*7f+Vector3.up*8f;
+                if(!ClearFlightPath(launch,head)) continue;
+                launchPoint=launch;direction=lane;return true;
+            }
+            return false;
+        }
+
+        private static bool ClearFlightPath(Vector3 start,Vector3 end)
+        {
+            Vector3 span=end-start;if(span.sqrMagnitude<.001f) return true;
+            int count=Physics.SphereCastNonAlloc(start,.45f,span.normalized,flightHits,span.magnitude,~0,QueryTriggerInteraction.Ignore);
+            if(count==flightHits.Length) return false;
+            for(int i=0;i<count;i++)
+            {
+                var collider=flightHits[i].collider;if(!collider) continue;
+                if(collider.GetComponentInParent<GoatController>() || collider.GetComponentInParent<GoatPhysicsPart>()) continue;
+                return false;
+            }
+            return true;
         }
 
         private static bool ClearPath(Vector3 start, Vector3 end)
@@ -459,6 +637,7 @@ namespace GoatDescent
             var body = target.GetComponent<Rigidbody>();
             if (!body) { BeginReturn(now); return; }
             carried = target;
+            carried.GetComponent<GoatComedyActions>()?.Clear();
             carried.GetComponent<GoatInteraction>()?.CancelAll();
             carried.GetComponent<GoatCliffGrip>()?.BreakGrip(CarryDuration + 1f);
             carried.GetComponent<GoatJumpController>()?.ResetInput();
@@ -531,11 +710,28 @@ namespace GoatDescent
 
         private Vector3 OrbitPoint(int index, float time)
         {
+            var bird=birds[index];
+            Vector3 side=Vector3.Cross(Vector3.up,bird.PatrolOutward);
             float angle = time * (index % 2 == 0 ? .36f : -.31f)
                 + index * (Mathf.PI * 2f / birds.Length);
-            return center + outward * (16f + Mathf.Cos(angle) * 6f)
-                + sideways * (Mathf.Sin(angle) * 8f)
+            return bird.PatrolCenter + bird.PatrolOutward * (16f + Mathf.Cos(angle) * 6f)
+                + side * (Mathf.Sin(angle) * 8f)
                 + Vector3.up * (16f + Mathf.Sin(angle * 1.4f) * 1.3f + index % 3 * 2f);
+        }
+
+        private void UpdatePatrol()
+        {
+            var pair=LocalGoatPair.Instance;if(!pair) return;
+            for(int i=0;i<birds.Length;i++)
+            {
+                var subject=i%2==0 ? pair.Primary : pair.Secondary;
+                if(!subject || subject.GetComponent<RespawnController>()?.IsDead==true)
+                    subject=i%2==0 ? pair.Secondary : pair.Primary;
+                if(!subject || subject.GetComponent<RespawnController>()?.IsDead==true) continue;
+                var bird=birds[i];
+                bird.PatrolCenter=Vector3.MoveTowards(bird.PatrolCenter,subject.transform.position,10f*Time.fixedDeltaTime);
+                bird.PatrolOutward=Vector3.RotateTowards(bird.PatrolOutward,OutwardFromPillar(subject.transform.position),1.4f*Time.fixedDeltaTime,0).normalized;
+            }
         }
 
         private void UpdateOrbit(float time)
@@ -544,6 +740,8 @@ namespace GoatDescent
             {
                 if (i == activeBirdIndex && phase != FlightPhase.Circling) continue;
                 Vector3 point = OrbitPoint(i, time);
+                if(birds[i].OrbitPlaced) point=Vector3.MoveTowards(birds[i].Root.position,point,FlightSpeed*Time.fixedDeltaTime);
+                birds[i].OrbitPlaced=true;
                 SetBirdPose(i, point, OrbitPoint(i, time + .05f) - point);
             }
         }
@@ -576,8 +774,19 @@ namespace GoatDescent
                 bool working = i == activeBirdIndex
                     && (phase == FlightPhase.Diving || phase == FlightPhase.Struggling);
                 float flap = Mathf.Sin(Time.time * (working ? 13f : 5f) + i * 1.4f) * 16f;
-                bird.LeftWing.localRotation = Quaternion.Euler(0f, 0f, flap);
-                bird.RightWing.localRotation = Quaternion.Euler(0f, 0f, -flap);
+                bool stunned = i == activeBirdIndex && phase == FlightPhase.KnockedBack;
+                float progress = MountainAuthority.IsHost
+                    ? Mathf.Clamp01((Time.time - phaseStarted) / RecoilDuration)
+                    : Mathf.Clamp01(1f - networkSecondsLeft / RecoilDuration);
+                float raised = stunned ? 70f * (1f - Mathf.SmoothStep(0, 1, progress)) : 0f;
+                float wingAngle = Mathf.Lerp(flap, -raised, stunned ? 1f - progress : 0f);
+                if (i == activeBirdIndex && phase == FlightPhase.Inspecting)
+                {
+                    bool checking = MountainAuthority.IsHost ? inspectionLanded : networkSecondsLeft < 3f;
+                    if (checking) wingAngle = 10f; // Wings fold down while examining the goat.
+                }
+                bird.LeftWing.localRotation = Quaternion.Euler(0f, 0f, wingAngle);
+                bird.RightWing.localRotation = Quaternion.Euler(0f, 0f, -wingAngle);
             }
         }
 
@@ -609,6 +818,13 @@ namespace GoatDescent
                 for (int i = 0; i < birds.Length; i++)
                 {
                     if (birds[i].Id != state.id) continue;
+                    bool impact = state.phase == (byte)FlightPhase.KnockedBack;
+                    if (impact && !birds[i].ImpactVisible)
+                    {
+                        birds[i].Root.SetPositionAndRotation(state.position, state.rotation);
+                        CartoonEagleVisual.ShedFeathers(birds[i].Root, materials[3]);
+                    }
+                    birds[i].ImpactVisible = impact;
                     birds[i].SnapshotPosition = state.position;
                     birds[i].SnapshotRotation = state.rotation;
                     if (state.phase != (byte)FlightPhase.Circling)

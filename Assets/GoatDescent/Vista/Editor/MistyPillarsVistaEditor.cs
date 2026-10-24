@@ -20,6 +20,7 @@ namespace GoatDescent.ProceduralWorld.Editor
         public static void ApplyToSavedWorld()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) throw new InvalidOperationException("Stop Play Mode before rebuilding the vista.");
+            VistaAssetPaths.RequireSavedWorld();
             Scene previous = SceneManager.GetActiveScene();
             Scene scene = SceneManager.GetSceneByPath(ScenePath);
             bool openedHere = !scene.isLoaded;

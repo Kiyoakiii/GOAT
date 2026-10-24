@@ -1,7 +1,7 @@
 {
     "name": "GoatDescent.Bootstrap",
     "rootNamespace": "GoatDescent",
-    "references": ["GoatDescent.Terrain", "GoatDescent.Player", "GoatDescent.Route", "GoatDescent.Decor"],
+    "references": ["GoatDescent.Terrain", "GoatDescent.Player", "GoatDescent.Route", "GoatDescent.Decor", "GoatDescent.ProceduralWorld.Runtime", "Unity.Netcode.Runtime", "Unity.Collections", "Unity.Services.Core", "Unity.Services.Authentication", "Unity.Services.Multiplayer"],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

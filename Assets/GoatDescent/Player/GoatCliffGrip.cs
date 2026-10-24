@@ -56,6 +56,7 @@ namespace GoatDescent
             if (!MountainAuthority.IsHost) return;
             CacheComponents();
             if (!body || !ground) return;
+            if ((GetComponent<GoatDescentTricks>()?.MadnessActive == true || GetComponent<GoatComedyActions>()?.Busy == true)) { Release(); return; }
             if (GetComponent<GoatController>()?.IsPredatorCarried ?? false) { Release(); return; }
             if (ground.IsGrounded && ground.SlopeAngle < 55f)
             {

@@ -21,7 +21,7 @@ namespace GoatDescent
         private void OnDestroy() { if (Instance == this) Instance = null; }
 
         public void Configure(GoatController a, GoatController b, ThirdPersonGoatCamera camera,
-            Vector3 summit, float initialYaw, Transform unusedPillar)
+            Vector3 summit, float initialYaw, Transform unusedPillar,bool spawnSupplies=true)
         {
             Primary = a;
             Secondary = b;
@@ -38,6 +38,15 @@ namespace GoatDescent
             b.GetComponent<GoatLocalControl>().Label = "B";
             b.GetComponent<GoatLocalControl>().IsRoutePlayer = true;
             Select(a);
+            if(!GetComponent<GoatSkinMenu>()) gameObject.AddComponent<GoatSkinMenu>();
+            if(!GetComponent<GoatSettingsMenu>()) gameObject.AddComponent<GoatSettingsMenu>();
+            if(spawnSupplies)
+            {
+                MadnessChest.Ensure(a);
+                DescentSupplyChest.Ensure(a);
+                BeerPuddle.EnsureNear(a);
+            }
+            if(!GetComponent<GoatHealthHud>()) gameObject.AddComponent<GoatHealthHud>();
             ScenarioCode = 0;
             Scenario = "Tab — сменить козла, F — толчок или сцепление рогами";
         }
@@ -46,6 +55,7 @@ namespace GoatDescent
         {
             if (!Primary || !Secondary) return;
             if (NetworkMode) return;
+            if (GoatSkinMenu.IsOpen || GoatSettingsMenu.BlocksInput) return;
             if (Input.GetKeyDown(KeyCode.Tab)) Select(Active == Primary ? Secondary : Primary);
             if (Input.GetKeyDown(KeyCode.F6)) ResetScenario(0);
             if (Input.GetKeyDown(KeyCode.F7)) ResetScenario(1);

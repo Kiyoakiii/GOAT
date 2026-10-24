@@ -21,7 +21,9 @@ namespace GoatDescent
         {
             var gate = component.GetComponent<GoatLocalControl>();
             var life = component.GetComponent<RespawnController>();
-            return (!gate || gate.IsControlled) && (!life || !life.IsDead);
+            return !GoatSettingsMenu.BlocksInput && !GoatSkinMenu.IsOpen
+                && component.GetComponent<GoatWaterDrinking>()?.Active != true
+                && (!gate || gate.IsControlled) && (!life || !life.IsDead);
         }
         public static bool CountsForRoute(Component component)
         {

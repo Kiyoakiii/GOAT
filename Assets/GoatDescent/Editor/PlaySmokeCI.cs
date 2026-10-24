@@ -21,6 +21,7 @@ namespace GoatDescent.EditorTools
         {
             string path = System.Environment.GetEnvironmentVariable("PLAY_SMOKE_SCENE");
             if (string.IsNullOrEmpty(path)) path = "Assets/GoatDescent/Vista/Scenes/ProceduralWorldMilestone.unity";
+            if (!System.IO.File.Exists(path)) throw new System.InvalidOperationException("The default milestone smoke scene is retired. Set PLAY_SMOKE_SCENE to an existing scene with a saved spawn marker.");
             EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
             var marker = GameObject.Find(MistyPillarsVistaBuilder.SpawnMarkerName);
             if (!marker)

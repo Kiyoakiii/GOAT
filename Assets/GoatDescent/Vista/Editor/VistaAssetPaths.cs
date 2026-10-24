@@ -5,6 +5,11 @@ namespace GoatDescent.ProceduralWorld.Editor
         public const string SettingsPath = "Assets/GoatDescent/Vista/Data/WorldSettings_Prototype.asset";
         public const string VegetationSettingsPath = "Assets/GoatDescent/Vista/Data/VegetationGenerationSettings_Prototype.asset";
         public const string ScenePath = "Assets/GoatDescent/Vista/Scenes/ProceduralWorldMilestone.unity";
+        public static void RequireSavedWorld()
+        {
+            if (!System.IO.File.Exists(ScenePath))
+                throw new System.InvalidOperationException("The milestone scene is retired. Open Assets/GoatDescent/Scenes/GoatPlayground.unity for green-pillars gameplay; use Generate Groundcover Preview for terrain experiments.");
+        }
         public const string GroundcoverPreviewScenePath = "Assets/GoatDescent/Vista/Scenes/ProceduralWorldGroundcoverPreview.unity";
         public const string TerrainDataPath = "Assets/GoatDescent/Vista/Generated/Terrain/ProceduralWorldTerrainData.asset";
         public const string MaterialRoot = "Assets/GoatDescent/Vista/Generated/Materials";

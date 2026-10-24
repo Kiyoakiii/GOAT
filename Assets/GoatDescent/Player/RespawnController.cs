@@ -5,7 +5,7 @@ namespace GoatDescent
     public sealed class RespawnController : MonoBehaviour
     {
         [SerializeField] private float killPlane = -12f;
-        [SerializeField] private float fatalLandingSpeed = 11.5f;
+        private float fatalLandingSpeed => GoatMechanics.For(this).fatalLandingSpeed;
         [SerializeField] private float respawnDelay = 1.2f;
         private Rigidbody body;
         private Vector3 spawn;
@@ -13,6 +13,7 @@ namespace GoatDescent
         private RouteProgressTracker routeProgress;
         private float fallingSpeed;
         private float respawnAt;
+        private float lastDamageAt=-100f;
         public bool IsDead { get; private set; }
         public bool HasCheckpoint { get; private set; }
         public void ApplyNetworkState(bool dead, bool hasCheckpoint)
@@ -20,6 +21,7 @@ namespace GoatDescent
         public void Configure(Rigidbody targetBody, Vector3 targetSpawn, RouteProgressTracker progress = null)
         { body = targetBody; spawn = summitSpawn = targetSpawn; routeProgress = progress; }
         public void SetCheckpoint(Vector3 point) { spawn = point; HasCheckpoint = true; }
+        public void SetKillPlane(float height) => killPlane=height;
         private void Awake()
         {
             body ??= GetComponent<Rigidbody>();
@@ -55,11 +57,25 @@ namespace GoatDescent
             {
                 Vector3 normal = collision.GetContact(i).normal;
                 float impactSpeed = Mathf.Max(-fallingSpeed, Mathf.Abs(Vector3.Dot(collision.relativeVelocity, normal)));
-                if (normal.y > .45f && impactSpeed >= fatalLandingSpeed) { Die(); return; }
+                if (normal.y <= .45f) continue;
+                if (impactSpeed >= fatalLandingSpeed) { Die(); return; }
+                var tuning=GoatMechanics.For(this);
+                if(impactSpeed>tuning.landingDamageStartSpeed && Time.time-lastDamageAt>tuning.landingDamageCooldown)
+                {
+                    lastDamageAt=Time.time;
+                    GetComponent<GoatHealth>()?.Damage(Mathf.InverseLerp(tuning.landingDamageStartSpeed,fatalLandingSpeed,impactSpeed)*tuning.maxLandingDamage);
+                    return;
+                }
             }
         }
         private void Die()
         {
+            if(IsDead) return;
+            GetComponent<GoatHealth>()?.MarkDead();
+            GetComponent<GoatBeerEffect>()?.Clear();
+            GetComponent<GoatToiletAction>()?.Cancel();
+            GetComponent<GoatWaterDrinking>()?.Cancel();
+            GetComponent<GoatHerdBehaviour>()?.ResetNerves();
             SkyPredatorEpisode.Current?.ReleaseGoat(GetComponent<GoatController>(), false);
             GetComponent<GoatInteraction>()?.CancelAll();
             IsDead = true;
@@ -70,6 +86,7 @@ namespace GoatDescent
             GetComponent<GoatLandingAssist>().enabled = false;
             var grip = GetComponent<GoatCliffGrip>(); if (grip) grip.enabled = false;
         }
+        public void Kill() {if(MountainAuthority.IsHost) Die();}
         public void Respawn()
         {
             Vector3 destination = routeProgress ? routeProgress.CheckpointPosition : spawn;
@@ -79,11 +96,21 @@ namespace GoatDescent
         }
         public void Teleport(Vector3 destination)
         {
+            GetComponent<GoatWaterDrinking>()?.Cancel();
+            GetComponent<GoatHerdBehaviour>()?.ResetNerves();
             SkyPredatorEpisode.Current?.ReleaseGoat(GetComponent<GoatController>(), false);
             GetComponent<GoatInteraction>()?.CancelAll();
             GetComponent<GoatController>()?.ClearInput();
+            GetComponent<GoatPunchBuff>()?.Clear();
+            GetComponent<GoatDescentInventory>()?.StopUse();
+            GetComponent<GoatDescentTricks>()?.Clear();
+            GetComponent<GoatComedyActions>()?.Clear();
+            GetComponent<GoatToiletAction>()?.Cancel();
             GetComponent<GoatCrashExplosion>()?.Restore();
             IsDead = false;
+            GetComponent<GoatHealth>()?.HealFully();
+            GetComponent<GoatBeerEffect>()?.Clear();
+            lastDamageAt=-100f;
             transform.SetPositionAndRotation(destination, Quaternion.identity);
             if (body)
             {

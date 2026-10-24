@@ -1,0 +1,96 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2d01661c05a8e7e4d8bf037c3e7b1fff, type: 3}
+  m_Name: Skin11
+  m_EditorClassIdentifier: GoatDescent.Player::GoatDescent.GoatSkinDefinition
+  number: 11
+  displayName: "\u0413\u043E\u0440\u043D\u044B\u0439 \u043A\u043E\u0437\u0451\u043B"
+  mesh: {fileID: 4300000, guid: 4cc23f2c020b5c943a405ee082dcd966, type: 2}
+  material: {fileID: 2100000, guid: 994b192643626d847956c22d61f9969a, type: 2}
+  materials:
+  - {fileID: 2100000, guid: 994b192643626d847956c22d61f9969a, type: 2}
+  - {fileID: 2100000, guid: f15a3ea118a514f49aefd0971e13c22f, type: 2}
+  - {fileID: 2100000, guid: 9d47ed6855c2df74ba267ec71c239e86, type: 2}
+  boneNames:
+  - Root
+  - Pelvis
+  - Spine
+  - Neck
+  - Head
+  - Tongue
+  - EyeAim.L
+  - Lid.L
+  - Brow.L
+  - EyeAim.R
+  - Lid.R
+  - Brow.R
+  - Ear.R
+  - Ear.L
+  - FrontUpper.L
+  - FrontLower.L
+  - FrontUpper.R
+  - FrontLower.R
+  - ElasticChest
+  - Tail
+  - HindUpper.L
+  - HindLower.L
+  - HindUpper.R
+  - HindLower.R
+  - ElasticMid
+  preview: {fileID: 2800000, guid: ef48ef961c2f4c24393f00ca9210f767, type: 3}
+  animations:
+  - {fileID: -5601949003121935374, guid: 8b4033370f7be2b4e95bcd1c3cb97204, type: 3}
+  - {fileID: 2597577237606258998, guid: 8b4033370f7be2b4e95bcd1c3cb97204, type: 3}
+  - {fileID: -3373281573706806188, guid: 8b4033370f7be2b4e95bcd1c3cb97204, type: 3}
+  - {fileID: 7400000, guid: 00b70e587a48ef944a3a30879b73ba47, type: 2}
+  - {fileID: 7376709292080602464, guid: cf4c271458633ee428c33fcc9eba7ca4, type: 3}
+  - {fileID: -6143901548851460865, guid: cf4c271458633ee428c33fcc9eba7ca4, type: 3}
+  - {fileID: -281356604059165763, guid: 8b4033370f7be2b4e95bcd1c3cb97204, type: 3}
+  - {fileID: 4558005469475097132, guid: 8b4033370f7be2b4e95bcd1c3cb97204, type: 3}
+  - {fileID: 4993014729962098651, guid: 8b4033370f7be2b4e95bcd1c3cb97204, type: 3}
+  - {fileID: 5745495127234503510, guid: 8b4033370f7be2b4e95bcd1c3cb97204, type: 3}
+  - {fileID: 249700018563751145, guid: 322d9828d8f636648807fd3b2a7f119c, type: 3}
+  - {fileID: 1229139866976064017, guid: 322d9828d8f636648807fd3b2a7f119c, type: 3}
+  - {fileID: 3163101221544827510, guid: 322d9828d8f636648807fd3b2a7f119c, type: 3}
+  - {fileID: 3655621276931614970, guid: 322d9828d8f636648807fd3b2a7f119c, type: 3}
+  - {fileID: 3776507913431660862, guid: 322d9828d8f636648807fd3b2a7f119c, type: 3}
+  - {fileID: 4831227774607224944, guid: 322d9828d8f636648807fd3b2a7f119c, type: 3}
+  - {fileID: 6049026401691080478, guid: 322d9828d8f636648807fd3b2a7f119c, type: 3}
+  - {fileID: 6689153003032639596, guid: 322d9828d8f636648807fd3b2a7f119c, type: 3}
+  - {fileID: 8196277359993221196, guid: 322d9828d8f636648807fd3b2a7f119c, type: 3}
+  - {fileID: -1114849096325272126, guid: 66f4b18358e0313409061dc6bcf3d543, type: 3}
+  - {fileID: -69406126446062072, guid: 66f4b18358e0313409061dc6bcf3d543, type: 3}
+  - {fileID: 1438076497274351913, guid: 66f4b18358e0313409061dc6bcf3d543, type: 3}
+  - {fileID: 4271968272244618447, guid: 66f4b18358e0313409061dc6bcf3d543, type: 3}
+  - {fileID: 5019225754471716675, guid: 66f4b18358e0313409061dc6bcf3d543, type: 3}
+  - {fileID: 6927506367023465940, guid: 66f4b18358e0313409061dc6bcf3d543, type: 3}
+  - {fileID: 7283945296457064709, guid: 66f4b18358e0313409061dc6bcf3d543, type: 3}
+  - {fileID: 9032594746956710752, guid: 035aa5f363df74141a0c2de7db77d562, type: 3}
+  - {fileID: -8444125299854684395, guid: ed374b1f548c30f43bdcf27e5dd7ac66, type: 3}
+  - {fileID: -714160617381586638, guid: ed374b1f548c30f43bdcf27e5dd7ac66, type: 3}
+  - {fileID: 6924450515389549422, guid: ed374b1f548c30f43bdcf27e5dd7ac66, type: 3}
+  - {fileID: 7332012885810246370, guid: ed374b1f548c30f43bdcf27e5dd7ac66, type: 3}
+  - {fileID: -8730079748675441276, guid: f8e476d235e0a914fb3ff1fe73806a1a, type: 3}
+  - {fileID: -5637630723866028685, guid: f8e476d235e0a914fb3ff1fe73806a1a, type: 3}
+  - {fileID: -3770985961596649927, guid: f8e476d235e0a914fb3ff1fe73806a1a, type: 3}
+  - {fileID: 1348986025009361173, guid: f8e476d235e0a914fb3ff1fe73806a1a, type: 3}
+  useCustomHeadAttachments: 1
+  headCollisionOffset: {x: 0.00000014842146, y: -0.029999804, z: 0.55999994}
+  noseOffset: {x: 0.000000080772466, y: 0.39399993, z: 0.38799965}
+  hornOffset: {x: 0.00000018585668, y: -0.11599967, z: 0.6853328}
+  tonguePrefab: {fileID: 2025749700706706857, guid: 83b814061749f6949b43d19664ef9475, type: 3}
+  tongueOffset: {x: 0.00000006820996, y: 0.36399993, z: 0.33399963}
+  tongueRotation: {x: 0.00000007389235, y: 0.7071069, z: 0.70710665, w: -0.000000111503184}
+  useCustomBodyAttachments: 1
+  droppingsOffset: {x: 0, y: -0.32803324, z: 0.12163072}
+  urineOffset: {x: 0.05, y: 0.07862989, z: 0.34031963}
+  grassNeckBendDegrees: 95

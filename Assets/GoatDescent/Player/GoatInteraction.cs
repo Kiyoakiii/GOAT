@@ -12,10 +12,14 @@ namespace GoatDescent
         [SerializeField] private float shoveImpulse = 205f;
         [SerializeField] private float shoveCooldown = .75f;
         [SerializeField] private float shoveContactTime = .25f;
+        [SerializeField, Range(0f, 1f)] private float contactShoveStrength = .6f;
+        [SerializeField] private float contactShoveCooldown = .9f;
         [SerializeField] private float gripSpring = 2800f;
         [SerializeField] private float gripDamping = 230f;
         [SerializeField] private float gripBreakForce = 5400f;
         [SerializeField] private float hornReach = .99f;
+        [SerializeField] private float airCatchRadius = .85f;
+        [SerializeField] private float minimumCatchFallSpeed = 1.5f;
         private Rigidbody body;
         private GoatController motor;
         private GoatVisualController visual;
@@ -31,6 +35,10 @@ namespace GoatDescent
         private float initialLimit;
         private float liftAnchor;
         private bool networkLinked, networkHolding;
+        private float nextContactShove;
+        private float electricGripBlockedUntil;
+        private bool resumeElectricGrip;
+        private float catchFeedbackUntil, caughtSpeed;
         public GoatInteraction Partner => held ? held : heldBy;
         public bool IsLinked => held || heldBy || (!MountainAuthority.IsHost && networkLinked);
         public bool IsHolding => held || (!MountainAuthority.IsHost && networkHolding);
@@ -65,27 +73,38 @@ namespace GoatDescent
             if (held && !joint) ReleaseGrip();
             if (pressing && !holdConsumed && Time.time - pressedAt >= holdThreshold)
             { holdConsumed = true; TryGrab(); }
-            if (!GoatLocalControl.AllowsInput(this)) return;
+            if (motor.NetworkOwnedByRemote || !GoatLocalControl.AllowsInput(this)) return;
             if (Input.GetKeyDown(KeyCode.F)) Press();
             if (Input.GetKeyUp(KeyCode.F)) ReleaseButton();
             if (!IsBusy && !pressing)
             {
                 var candidate = FindTarget();
-                Status = candidate ? "F — толкнуть · удерживать F — сцепить рога" : "Подойди и повернись к напарнику";
+                Status = candidate ? "F — толкнуть · удерживать F — сцепить рога" : "Удерживай F — поймать падающего напарника перед собой";
             }
         }
-        public void Press() { if (!Ready || pressing) return; pressing = true; holdConsumed = false; pressedAt = Time.time; }
+        public void Press()
+        {
+            if (GetComponent<GoatWaterDrinking>()?.Active == true) return;
+            if (GetComponent<GoatPunchBuff>()?.PerformingPair == true) return;
+            var comedy = GetComponent<GoatComedyActions>();
+            if (comedy && comedy.Busy) { if (comedy.PlayingDead) comedy.BreakPretence(); return; }
+            if (!Ready || pressing || GetComponent<GoatDescentTricks>()?.MadnessActive == true) return;
+            if (Time.time < electricGripBlockedUntil)
+            { pressing = holdConsumed = resumeElectricGrip = true; return; }
+            pressing = true; holdConsumed = false; pressedAt = Time.time;
+        }
         public void ReleaseButton()
         {
             if (!pressing) return;
             pressing = false;
+            resumeElectricGrip = false;
             if (holdConsumed) { grabPending = false; pendingTarget = null; ReleaseGrip(); }
             else TryShove();
         }
         public GoatInteraction FindTarget()
         {
             GoatInteraction best = null;
-            float bestDistance = reach;
+            float bestDistance = float.PositiveInfinity;
             foreach (var other in FindObjectsByType<GoatInteraction>(FindObjectsSortMode.None))
             {
                 if (other == this || !CanReach(other)) continue;
@@ -94,11 +113,25 @@ namespace GoatDescent
             }
             return best;
         }
+        private float ReachFor(GoatInteraction other)
+        {
+            if(!other || (!GetComponent<GoatSkin>()?.HeadAttachments && !other.GetComponent<GoatSkin>()?.HeadAttachments))
+                return reach;
+            var ownRig=GetComponent<GoatPhysicalBody>();var otherRig=other.GetComponent<GoatPhysicalBody>();
+            if(!ownRig || !otherRig) return reach;
+            // Two long muzzles and their contact capsules can meet before the
+            // old root-to-root reach. Keep F usable at that physical contact.
+            float ownLength=Vector3.ProjectOnPlane(ownRig.NosePosition-transform.position,Vector3.up).magnitude;
+            float otherLength=Vector3.ProjectOnPlane(otherRig.NosePosition-other.transform.position,Vector3.up).magnitude;
+            return Mathf.Max(reach,Mathf.Min(3.3f,ownLength+otherLength+.55f));
+        }
         private bool CanReach(GoatInteraction other)
         {
             if (!other || !other.Ready || other.IsLinked) return false;
+            var comedy = other.GetComponent<GoatComedyActions>();
+            if (comedy && comedy.IsMounted) return false;
             Vector3 delta = other.transform.position - transform.position;
-            if (delta.magnitude > reach || Mathf.Abs(delta.y) > 1.8f) return false;
+            if (delta.magnitude > ReachFor(other) || Mathf.Abs(delta.y) > 1.8f) return false;
             Vector3 flat = Vector3.ProjectOnPlane(delta, Vector3.up);
             if (flat.sqrMagnitude > .01f && Vector3.Angle(Vector3.ProjectOnPlane(Facing, Vector3.up), flat) > halfAngle) return false;
             return HasClearPath(other);
@@ -151,8 +184,12 @@ namespace GoatDescent
         }
         public bool TryGrab()
         {
-            if (!Ready || IsBusy) return false;
+            if (!Ready || IsBusy || Time.time < electricGripBlockedUntil) return false;
+            if (TryAirCatch()) return true;
+            if (Time.time < electricGripBlockedUntil) return false;
             var other = FindTarget();
+            if (other && !other.motor.Grounded && other.body.linearVelocity.y < -minimumCatchFallSpeed)
+            { Status = "ГОТОВ ЛОВИТЬ — держи F и повернись к напарнику"; return false; }
             if (!other) { Status = "Не дотянуться до рогов"; return false; }
             pendingTarget = other; grabPending = true; grabAt = Time.time + .22f;
             actionDirection = Vector3.ProjectOnPlane(other.body.position - body.position, Vector3.up).normalized;
@@ -164,6 +201,14 @@ namespace GoatDescent
         private void FixedUpdate()
         {
             if (!MountainAuthority.IsHost || !Ready) return;
+            // Keep looking throughout the held button, even if nobody was in
+            // reach when F was first pressed. Sweep the next physics step so a
+            // fast descending head cannot skip the interception window.
+            if (pressing && holdConsumed && !IsBusy)
+            {
+                bool caught = TryAirCatch();
+                if (!caught && resumeElectricGrip && Time.time >= electricGripBlockedUntil) TryGrab();
+            }
             if (shovePending && Time.time >= contactAt)
             {
                 shovePending = false;
@@ -188,7 +233,8 @@ namespace GoatDescent
             {
                 grabPending = false;
                 var other = pendingTarget; pendingTarget = null;
-                if (CanReach(other)) Attach(other);
+                if (CanReach(other) && (other.motor.Grounded
+                    || other.body.linearVelocity.y >= -minimumCatchFallSpeed)) Attach(other);
             }
             if (!held) return;
             if (!held.Ready || !joint || Vector3.Distance(body.position, held.body.position) > 3.8f)
@@ -199,6 +245,10 @@ namespace GoatDescent
                 if (Time.time - obstructionSince > .2f) { ReleaseGrip(); return; }
             }
             else obstructionSince = -1f;
+            float teamwork = Mathf.Min(GetComponent<GoatPunchBuff>()?.GripMultiplier ?? 1f,
+                held.GetComponent<GoatPunchBuff>()?.GripMultiplier ?? 1f);
+            joint.breakForce = gripBreakForce * teamwork;
+            joint.linearLimitSpring = new SoftJointLimitSpring { spring = gripSpring * teamwork, damper = gripDamping * teamwork };
             Vector3 direction = Vector3.ProjectOnPlane(held.body.position - body.position, Vector3.up).normalized;
             // The rescuer lifts its head while stepping back. The joint carries
             // this motion as force to both bodies, including the rescuer's recoil.
@@ -215,11 +265,75 @@ namespace GoatDescent
             Status = IsPulling ? "ТЯНЕТ НАПАРНИКА" : "РОГА СЦЕПЛЕНЫ — отпусти F, чтобы разжать";
             if (!IsPulling && (GetComponent<GoatGripBalance>()?.Unbalance01 ?? 0f) > .1f)
                 Status = "ТЯНЕТ К КРАЮ — отходи назад или отпусти F";
+            if (Time.time < catchFeedbackUntil)
+                Status = caughtSpeed > 7f ? "ПОЙМАЛ! СИЛЬНЫЙ РЫВОК — УПИРАЙСЯ И ДЕРЖИ F"
+                    : "ПОЙМАЛ НА ЛЕТУ! ДЕРЖИ F, ОТХОДИ ОТ КРАЯ";
+        }
+        private bool TryAirCatch()
+        {
+            if (Time.time < electricGripBlockedUntil || !pressing || !holdConsumed || !Ready || IsBusy || motor.IsPredatorCarried
+                || GetComponent<GoatPunchBuff>()?.PerformingPair == true
+                || GetComponent<GoatComedyActions>()?.Busy == true
+                || GetComponent<GoatDescentTricks>()?.Busy == true) return false;
+            var ownRig = GetComponent<GoatPhysicalBody>();
+            if (!ownRig) return false;
+            GoatInteraction best = null;
+            Vector3 bestDirection = Vector3.zero;
+            float bestDistance = airCatchRadius;
+            foreach (var other in FindObjectsByType<GoatInteraction>(FindObjectsSortMode.None))
+            {
+                if (other == this || !other.Ready || other.IsBusy || other.motor.Grounded
+                    || other.motor.IsPredatorCarried || other.body.linearVelocity.y >= -minimumCatchFallSpeed
+                    || other.GetComponent<GoatComedyActions>()?.Busy == true
+                    || other.GetComponent<GoatDescentTricks>()?.Busy == true) continue;
+                Vector3 delta = other.body.position - body.position;
+                if (delta.y < -.6f || delta.y > 3f || delta.magnitude > ReachFor(other) + 1f) continue;
+                Vector3 direction = Vector3.ProjectOnPlane(delta, Vector3.up);
+                if (direction.sqrMagnitude < .01f) direction = Vector3.ProjectOnPlane(Facing,Vector3.up);
+                direction.Normalize();
+                if (Vector3.Angle(Vector3.ProjectOnPlane(Facing,Vector3.up),direction) > halfAngle) continue;
+                var otherRig = other.GetComponent<GoatPhysicalBody>();
+                if (!otherRig || !ownRig.TryGetHornConnection(direction,out var ownHead,out var ownAnchor)
+                    || !otherRig.TryGetHornConnection(-direction,out var otherHead,out var otherAnchor)) continue;
+                Vector3 ownPoint = ownHead.transform.TransformPoint(ownAnchor);
+                Vector3 otherPoint = otherHead.transform.TransformPoint(otherAnchor);
+                Vector3 relative = otherPoint - ownPoint;
+                Vector3 step = (otherHead.GetPointVelocity(otherPoint)-ownHead.GetPointVelocity(ownPoint)) * Time.fixedDeltaTime;
+                float fraction = step.sqrMagnitude > .000001f
+                    ? Mathf.Clamp01(-Vector3.Dot(relative,step)/step.sqrMagnitude) : 0f;
+                float distance = (relative+step*fraction).magnitude;
+                if (distance > bestDistance || !HasClearPath(other)) continue;
+                best = other; bestDistance = distance; bestDirection = direction;
+            }
+            if (!best) { Status = "ГОТОВ ЛОВИТЬ — держи F и повернись к напарнику"; return false; }
+            Vector3 ownVelocity = body.linearVelocity, otherVelocity = best.body.linearVelocity;
+            caughtSpeed = Mathf.Max(0f,ownVelocity.y-otherVelocity.y);
+            actionDirection = bestDirection;
+            Attach(best);
+            if (held != best) return false;
+            // Share momentum instead of erasing the falling goat's velocity.
+            // Both full rigs participate: a fast fall pulls the catcher harder.
+            var caughtRig = best.GetComponent<GoatPhysicalBody>();
+            float ownMass = ownRig.TotalSimulatedMass, otherMass = caughtRig.TotalSimulatedMass;
+            Vector3 shared = (ownVelocity*ownMass + otherVelocity*otherMass)/(ownMass+otherMass);
+            motor.ReceiveImpulse((shared-ownVelocity)*body.mass,1.1f);
+            best.motor.ReceiveImpulse((shared-otherVelocity)*best.body.mass,1.1f);
+            ownRig.ApplyCatchVelocityChange(shared-ownVelocity);
+            caughtRig.ApplyCatchVelocityChange(shared-otherVelocity);
+            best.GetComponent<GoatCliffGrip>()?.BreakGrip(.7f);
+            best.GetComponent<GoatGripController>()?.ResetGrip();
+            best.GetComponent<GoatJumpController>()?.ResetInput();
+            visual?.PlayInteraction("Goat_GrabStart",.42f,actionDirection);
+            catchFeedbackUntil = Time.time+1.8f;
+            Status = "ПОЙМАЛ НА ЛЕТУ! ДЕРЖИ F";
+            return true;
         }
         private void Attach(GoatInteraction other)
         {
-            if (other.IsBusy) return;
+            if (other.IsBusy || Time.time < electricGripBlockedUntil || Time.time < other.electricGripBlockedUntil) return;
+            if (GetComponent<GoatHerdBehaviour>()?.TryShock(other.GetComponent<GoatHerdBehaviour>()) == true) return;
             held = other; other.heldBy = this; linkedAt = Time.time; liftAnchor = 0f;
+            resumeElectricGrip = false;
             joint = gameObject.AddComponent<ConfigurableJoint>();
             joint.autoConfigureConnectedAnchor = false;
             joint.connectedBody = other.body;
@@ -266,6 +380,7 @@ namespace GoatDescent
                 visual?.PlayInteraction("Goat_Release", .35f, Facing);
             }
             obstructionSince = -1f;
+            catchFeedbackUntil = 0f;
         }
 
         private void PullHornsTogether()
@@ -288,9 +403,55 @@ namespace GoatDescent
         }
         private void OnJointBreak(float force)
         { joint = null; ReleaseGrip(); Status = "Рога соскользнули"; }
+
+        private void OnCollisionEnter(Collision collision) => TryContactShove(collision);
+        private void OnCollisionStay(Collision collision) => TryContactShove(collision);
+
+        private void TryContactShove(Collision collision)
+        {
+            var charged = collision.rigidbody ? collision.rigidbody.GetComponentInParent<GoatHerdBehaviour>() : null;
+            if (charged && GetComponent<GoatHerdBehaviour>()?.TryShock(charged) == true) return;
+            if (!MountainAuthority.IsHost || !Ready || IsBusy || GetComponent<GoatComedyActions>()?.IsMounted == true || motor.IsPredatorCarried
+                || Time.time < nextContactShove || Time.time < nextShove) return;
+            var other = collision.rigidbody ? collision.rigidbody.GetComponent<GoatInteraction>() : null;
+            if (!other || other == this || !other.Ready || other.GetComponent<GoatComedyActions>()?.IsMounted == true || other.IsBusy
+                || other.motor.IsPredatorCarried || Time.time < other.nextContactShove) return;
+            Vector3 movement = motor.MoveDirection;
+            if (movement.sqrMagnitude < .1f) return;
+            Vector3 direction = Vector3.zero;
+            float approach = .3f;
+            for (int i = 0; i < collision.contactCount; i++)
+            {
+                Vector3 outward = Vector3.ProjectOnPlane(-collision.GetContact(i).normal, Vector3.up).normalized;
+                float alignment = Vector3.Dot(movement, outward);
+                if (alignment <= approach) continue;
+                approach = alignment;
+                direction = outward;
+            }
+            if (direction.sqrMagnitude < .1f) return;
+            // One modest shove, using the same response as F. Share the
+            // cooldown so simultaneous callbacks cannot multiply the impulse.
+            Vector3 impulse = (direction + Vector3.up * .08f).normalized
+                * shoveImpulse * contactShoveStrength;
+            other.motor.ReceiveImpulse(impulse, .4f);
+            motor.ReceiveImpulse(-impulse * .12f, .2f);
+            other.GetComponent<GoatCliffGrip>()?.BreakGrip(.25f);
+            other.visual?.PlayInteraction("Goat_PushReact", .5f, other.Facing);
+            nextContactShove = other.nextContactShove = Time.time + contactShoveCooldown;
+        }
+
+        public void InterruptElectricGrip(float seconds)
+        {
+            bool retry = pressing;
+            CancelAll();
+            electricGripBlockedUntil = Time.time + seconds;
+            nextContactShove = nextShove = Mathf.Max(nextShove, electricGripBlockedUntil);
+            if (retry) pressing = holdConsumed = resumeElectricGrip = true;
+        }
         public void CancelAll()
         {
             pressing = holdConsumed = shovePending = grabPending = false; pendingTarget = null; pendingStone = null;
+            resumeElectricGrip = false;
             ReleaseGrip();
         }
         private void OnDisable() => CancelAll();

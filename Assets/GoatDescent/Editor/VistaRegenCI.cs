@@ -10,6 +10,7 @@ namespace GoatDescent.EditorTools
         public static void RegenerateMeshes()
         {
             string vistaScenePath = "Assets/GoatDescent/Vista/Scenes/ProceduralWorldMilestone.unity";
+            if (!System.IO.File.Exists(vistaScenePath)) throw new System.InvalidOperationException("The milestone scene is retired and will not be recreated. Use GoatPlayground for current gameplay.");
             Scene previous = SceneManager.GetActiveScene();
             Scene scene = EditorSceneManager.OpenScene(vistaScenePath, OpenSceneMode.Additive);
             try

@@ -1,0 +1,16 @@
+.health-root, .health-document, .health-template { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+.health-card { position: absolute; left: 22px; bottom: 72px; width: 286px; background-color: rgb(255,243,212); border-color: rgb(49,42,43); border-width: 3px; border-radius: 18px; padding: 10px 13px; }
+.health-owner { color: rgb(73,59,57); font-size: 12px; -unity-font-style: bold; margin-bottom: 5px; }
+.health-row { flex-direction: row; align-items: center; }
+.health-heart { color: rgb(239,99,88); font-size: 32px; -unity-font-style: bold; margin-right: 8px; }
+.health-bar { flex-grow: 1; height: 29px; background-color: rgb(66,57,58); border-width: 2px; border-color: rgb(49,42,43); border-radius: 11px; overflow: hidden; }
+.health-trail, .health-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; border-radius: 8px; }
+.health-trail { background-color: rgb(247,151,94); }
+.health-fill { background-color: rgb(78,193,148); }
+.health-shine { height: 5px; margin: 3px 6px 0 6px; border-radius: 5px; background-color: rgba(232,255,232,.6); }
+.health-value { position: absolute; left: 0; right: 0; top: 0; bottom: 0; color: rgb(255,255,242); font-size: 16px; -unity-font-style: bold; -unity-text-align: middle-center; }
+.hurt .health-fill { background-color: rgb(228,91,80); }
+.beer-status { color: rgb(138,78,26); font-size: 12px; -unity-font-style: bold; margin-top: 5px; }
+.herd-status { color: rgb(48,93,126); font-size: 12px; -unity-font-style: bold; margin-top: 5px; white-space: normal; }
+.coat-status { color: rgb(150,87,65); font-size: 12px; -unity-font-style: bold; margin-top: 5px; white-space: normal; }
+.hidden { display: none; }

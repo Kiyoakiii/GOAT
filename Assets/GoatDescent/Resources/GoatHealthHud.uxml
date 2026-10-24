@@ -1,0 +1,18 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+  <ui:VisualElement class="health-root">
+    <ui:VisualElement name="healthCard" class="health-card">
+      <ui:Label name="healthOwner" text="КОЗЁЛ A  ·  ЗДОРОВЬЕ" class="health-owner" />
+      <ui:VisualElement class="health-row">
+        <ui:Label text="♥" class="health-heart" />
+        <ui:VisualElement class="health-bar">
+          <ui:VisualElement name="healthTrail" class="health-trail" />
+          <ui:VisualElement name="healthFill" class="health-fill"><ui:VisualElement class="health-shine" /></ui:VisualElement>
+          <ui:Label name="healthValue" text="100 / 100" class="health-value" />
+        </ui:VisualElement>
+      </ui:VisualElement>
+      <ui:Label name="beerStatus" class="beer-status hidden" />
+      <ui:Label name="herdStatus" class="herd-status hidden" />
+      <ui:Label name="coatStatus" class="coat-status hidden" />
+    </ui:VisualElement>
+  </ui:VisualElement>
+</ui:UXML>

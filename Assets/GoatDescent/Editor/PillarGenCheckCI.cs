@@ -24,6 +24,7 @@ namespace GoatDescent.EditorTools
         public static void Check()
         {
             string path = "Assets/GoatDescent/Vista/Scenes/ProceduralWorldMilestone.unity";
+            if (!System.IO.File.Exists(path)) throw new System.InvalidOperationException("This check targets the retired baked milestone scene. Use GoatPlayground for current green-pillars gameplay.");
             EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
             int errors = 0;
 

@@ -67,7 +67,16 @@ namespace GoatDescent
         public void RainbowDash() => Show("RAINBOW GOAT!", Pink, 2.6f, 55);
         public void Bumper() => Show("BONK!", Blue, 2.2f, 42);
         public void Crash() => Show("БА-БАХ! КОЗЁЛ ВДРЕБЕЗГИ!", Yellow, 3.4f, 55);
-        public void Finish() => Show("MOUNTAIN SURVIVED!", Mint, 3f, 90);
+        public void Shelter(string label)
+        {
+            Show("КОЗЁЛ "+label+" В ПЕЩЕРЕ!  1 / 2",Mint,1f,12);
+            captionEnd=Time.unscaledTime+2.5f;
+        }
+        public void Finish(string text="MOUNTAIN SURVIVED!")
+        {
+            Show(text,Mint,3f,90);
+            captionEnd=Time.unscaledTime+4f;
+        }
         public void AvalancheHit() => Show("SNOWBALL BONK!", Blue, 2.8f, 65);
 
         public void Land(float impact)
@@ -113,6 +122,7 @@ namespace GoatDescent
 
         private void OnGUI()
         {
+            if(GoatSkinMenu.IsOpen || GoatSettingsMenu.IsOpen) return;
             float remaining = captionEnd - Time.unscaledTime;
             if (remaining <= 0f || string.IsNullOrEmpty(caption)) return;
             float opacity = Mathf.Clamp01(remaining * 3f);

@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2de093462c2bf134fa0ac4eebed15ad7, type: 3}
+  m_Name: GoatMechanics
+  m_EditorClassIdentifier: GoatDescent.Player::GoatDescent.GoatMechanicsSettings
+  muscleStrength: 1
+  groundedMuscleStrength: 1
+  jumpMuscleStrength: 1.05
+  groundedDamping: 1.8
+  airborneDamping: 1.25
+  maxMuscleAcceleration: 900
+  walkingAnimationAmplitude: 0.9
+  spineBendDegrees: 10
+  elasticBendDegrees: 6
+  upperLegSideDegrees: 16
+  lowerLegSideDegrees: 7
+  pelvisSwingDegrees: 32
+  headBendDegrees: 25
+  neckBendDegrees: 20
+  walkingHeadSwayDegrees: 3
+  walkingNeckSwayDegrees: 1.6
+  stationaryJumpSpeed: 1.1
+  stationaryJumpPose: 0.72
+  stationaryJumpFrontLead: 0.65
+  stationaryJumpDamping: 1.65
+  movingJumpDamping: 1.25
+  jumpPoseSeconds: 0.72
+  jumpStabilizationSeconds: 1.25
+  jumpVelocity: 5.15
+  airJumpVelocity: 3.6
+  chargedVerticalBonus: 1.15
+  chargedForwardBoost: 2.4
+  fullChargeSeconds: 0.72
+  coyoteTime: 0.12
+  jumpBuffer: 0.15
+  maxGroundSpeed: 5.35
+  groundAcceleration: 19
+  airAcceleration: 5
+  steepGripAngle: 73
+  slideAngle: 86
+  steepSpeedMultiplier: 0.85
+  stability: 1
+  balanceSlipThreshold: 0.28
+  balanceSlipDelay: 0.35
+  balanceRecoverySpeed: 2.8
+  maxBalanceLean: 22
+  passengerMassMultiplier: 0.25
+  landingDamageStartSpeed: 11.5
+  fatalLandingSpeed: 16
+  maxLandingDamage: 30
+  landingDamageCooldown: 0.35

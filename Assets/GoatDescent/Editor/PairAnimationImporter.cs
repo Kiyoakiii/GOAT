@@ -16,6 +16,17 @@ namespace GoatDescent.Editor
         [MenuItem("Tools/Goat Descent/Import Goat Physics Animations")]
         public static void ImportPhysics() => Import(PhysicsSource, 7, "GOAT_PHYSICS_ANIMATIONS_READY");
 
+        [MenuItem("Tools/Goat Descent/Import Right Punch Animation")]
+        public static void ImportRightPunch() => Import("Assets/GoatDescent/Art/RefinedGoat/Goat_RightPunch.fbx", 1, "RIGHT_PUNCH_READY");
+
+        [MenuItem("Tools/Goat Descent/Import Descent Tricks")]
+        public static void ImportDescentTricks() => Import("Assets/GoatDescent/Art/RefinedGoat/Goat_DescentTricks.fbx", 4, "DESCENT_TRICKS_READY");
+
+        [MenuItem("Tools/Goat Descent/Import Comedy Actions")]
+        public static void ImportComedy() => Import("Assets/GoatDescent/Art/RefinedGoat/Goat_ComedyActions.fbx", 4, "COMEDY_ACTIONS_READY");
+        [MenuItem("Tools/Goat Descent/Import Toilet Actions")]
+        public static void ImportToilet() => Import("Assets/GoatDescent/Art/RefinedGoat/Goat_ToiletActions.fbx",2,"TOILET_ACTIONS_READY");
+
         private static void Import(string source, int expectedClips, string logPrefix)
         {
             AssetDatabase.ImportAsset(source, ImportAssetOptions.ForceSynchronousImport);

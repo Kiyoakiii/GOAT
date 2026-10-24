@@ -29,8 +29,11 @@ namespace GoatDescent
                 objectStone.name = $"STONE-{i + 1:00}";
                 objectStone.transform.SetParent(transform);
                 float diameter = i % 3 == 0 ? 1.25f : .85f;
-                objectStone.transform.position = platform.Center + new Vector3(
-                    (i % 2 == 0 ? -1f : 1f) * 1.15f, diameter * .5f + .15f, .45f);
+                Vector3 travel=stoneSites[i]+1<route.Count
+                    ? Vector3.ProjectOnPlane(route[stoneSites[i]+1].Center-platform.Center,Vector3.up).normalized : Vector3.forward;
+                Vector3 side=Vector3.Cross(Vector3.up,travel);
+                objectStone.transform.position = platform.Center+side*(i%2==0 ? -.55f : .55f)
+                    -travel*.15f+Vector3.up*(diameter*.5f+.15f);
                 objectStone.transform.localScale = Vector3.one * diameter;
                 objectStone.GetComponent<Renderer>().sharedMaterial = rock;
                 var body = objectStone.AddComponent<Rigidbody>();
@@ -47,10 +50,10 @@ namespace GoatDescent
             }
             if (!routeProps) return;
             int looseIndex = 0;
-            foreach (var collider in routeProps.GetComponentsInChildren<MeshCollider>())
+            foreach (var collider in routeProps.GetComponentsInChildren<Collider>())
             {
                 bool snow = collider.name == "Ice Landing";
-                if (!snow && collider.name != "Crumbling Landing") continue;
+                if (!snow && !collider.GetComponent<CrumblingPlatform>()) continue;
                 var surface = collider.gameObject.AddComponent<LooseSurface>();
                 surface.Initialize($"{(snow ? "SNOW" : "GRAVEL")}-{++looseIndex:00}", snow);
                 surfaces.Add(surface);

@@ -4,13 +4,15 @@ namespace GoatDescent
 {
     public sealed class GoatJumpController : MonoBehaviour
     {
-        [SerializeField] private float jumpVelocity = 5.15f;
-        [SerializeField] private float airJumpVelocity = 3.6f;
-        [SerializeField] private float chargedVerticalBonus = 1.15f;
-        [SerializeField] private float chargedForwardBoost = 2.4f;
-        [SerializeField] private float fullChargeSeconds = .72f;
-        [SerializeField] private float coyoteTime = .12f;
-        [SerializeField] private float jumpBuffer = .15f;
+        private GoatMechanicsSettings tuning;
+        private GoatMechanicsSettings Tuning => tuning ? tuning : tuning=GoatMechanics.For(this);
+        private float jumpVelocity => Tuning.jumpVelocity;
+        private float airJumpVelocity => Tuning.airJumpVelocity;
+        private float chargedVerticalBonus => Tuning.chargedVerticalBonus;
+        private float chargedForwardBoost => Tuning.chargedForwardBoost;
+        private float fullChargeSeconds => Tuning.fullChargeSeconds;
+        private float coyoteTime => Tuning.coyoteTime;
+        private float jumpBuffer => Tuning.jumpBuffer;
         private GoatController controller;
         private GoatGroundDetector ground;
         private GoatCliffGrip cliffGrip;
@@ -53,6 +55,16 @@ namespace GoatDescent
             CacheComponents();
             if (!MountainAuthority.IsHost || !controller || !ground) return;
             if (controller.IsPredatorCarried) { ResetInput(); return; }
+            var toilet=GetComponent<GoatToiletAction>();
+            if(toilet && toilet.Active)
+            {
+                bool cancel=controller.NetworkOwnedByRemote ? remoteSpaceDown
+                    : GoatLocalControl.AllowsInput(this) && Input.GetKeyDown(KeyCode.Space);
+                remoteSpaceDown=remoteSpaceUp=false;
+                if(cancel) toilet.Cancel();
+                ResetInput();return;
+            }
+            if (GetComponent<GoatDescentTricks>()?.MadnessActive == true) { ResetInput(); return; }
             if (GetComponent<GoatSlopeBalance>()?.IsSlipping == true)
             { ResetInput(); return; }
             bool remote = controller.NetworkOwnedByRemote;
@@ -60,6 +72,13 @@ namespace GoatDescent
             bool pressed = remote ? remoteSpaceDown : Input.GetKeyDown(KeyCode.Space);
             bool released = remote ? remoteSpaceUp : Input.GetKeyUp(KeyCode.Space);
             remoteSpaceDown = remoteSpaceUp = false;
+            var comedy = GetComponent<GoatComedyActions>();
+            if (comedy && comedy.Busy)
+            {
+                if (pressed && comedy.IsMounted) comedy.Dismount(true);
+                else if (pressed && comedy.PlayingDead) comedy.BreakPretence();
+                ResetInput(); return;
+            }
             if (HasFooting && !groundJumpUsed) lastGrounded = Time.time;
             if (!ground.IsGrounded) wasAirborne = true;
             if (HasFooting && wasAirborne)

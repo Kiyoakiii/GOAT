@@ -9,7 +9,7 @@ namespace GoatDescent
             bool checkpointRespawn = true, bool configureCamera = true)
         {
             var goat = new GameObject("Mountain Goat");
-            goat.transform.position = spawn;
+            goat.transform.SetPositionAndRotation(spawn,Quaternion.Euler(0f,initialYaw,0f));
             int playerLayer = LayerMask.NameToLayer("Player");
             if (playerLayer >= 0) goat.layer = playerLayer;
 
@@ -25,8 +25,12 @@ namespace GoatDescent
             capsule.center = new Vector3(0f, .58f, 0f);
 
             var detector = goat.AddComponent<GoatGroundDetector>();
+            goat.AddComponent<GoatMechanics>();
             var controller = goat.AddComponent<GoatController>();
             controller.Configure(body, detector);
+            goat.AddComponent<GoatHealth>();
+            goat.AddComponent<GoatBeerEffect>();
+            goat.AddComponent<GoatToiletAction>();
             goat.AddComponent<GoatLocalControl>();
             goat.AddComponent<GoatJumpController>().Configure(controller, detector);
             goat.AddComponent<GoatCliffGrip>();
@@ -35,7 +39,15 @@ namespace GoatDescent
             goat.AddComponent<GoatLandingAssist>().Configure(body, detector);
             goat.AddComponent<GoatVisualController>().Configure(body, detector);
             goat.AddComponent<GoatPhysicalBody>();
+            goat.AddComponent<GoatSkin>();
             goat.AddComponent<GoatInteraction>();
+            goat.AddComponent<GoatPunchBuff>();
+            goat.AddComponent<GoatDescentTricks>();
+            goat.AddComponent<GoatComedyActions>();
+            goat.AddComponent<GoatDescentInventory>();
+            goat.AddComponent<GoatHerdBehaviour>();
+            goat.AddComponent<GoatFurEffect>();
+            goat.AddComponent<GoatWaterDrinking>();
             goat.AddComponent<GoatSpectacle>();
             var routeProgress = goat.AddComponent<RouteProgressTracker>();
             routeProgress.Configure(MountainGenerator.CurrentRoute, MountainMaterial.Get(), spawn, checkpointRespawn);
@@ -51,6 +63,7 @@ namespace GoatDescent
             camera.clearFlags = CameraClearFlags.Skybox;
             camera.backgroundColor = new Color(.52f, .73f, .90f);
             camera.farClipPlane = 900f;
+            if (!Object.FindFirstObjectByType<AudioListener>()) camera.gameObject.AddComponent<AudioListener>();
             if (!camera.GetComponent<CinematicPostProcess>())
                 camera.gameObject.AddComponent<CinematicPostProcess>();
             var follow = camera.GetComponent<ThirdPersonGoatCamera>();
