@@ -53,6 +53,12 @@ namespace GoatDescent
         private float lastSupportedAt;
         private float walkBlend;
         private float walkPhase;
+        private Vector3 previousMotionVelocity;
+        private bool motionWasSupported;
+        private float motionPitch;
+        private float motionRoll;
+        private float motionLift;
+        private float landingCompression;
         private float turnStepUntil;
         private float turnWalkTime;
         private float turnWalkDirection = 1f;
@@ -571,7 +577,7 @@ namespace GoatDescent
                 firstPersonTurning = normalTurning && motor.TryGetFirstPersonFacing(out locomotionFacing);
                 if (!firstPersonTurning)
                     locomotionFacing = motor.HasMovementInput
-                        ? Vector3.ProjectOnPlane(motor.MoveDirection, Vector3.up) : Vector3.zero;
+                        ? Vector3.ProjectOnPlane(motor.MovementFacing, Vector3.up) : Vector3.zero;
                 if (locomotionFacing.sqrMagnitude > .01f) locomotionFacing.Normalize();
             }
             float signedTurn = locomotionFacing.sqrMagnitude > .01f
@@ -606,9 +612,11 @@ namespace GoatDescent
             if (turningInPlace) turnWalkTime += turnWalkDirection * Time.fixedDeltaTime * .85f;
             bool walking = supported && !carried && !linked && clip == "Goat_Walk"
                 && horizontalVelocity.sqrMagnitude > .16f;
-            float walkTarget = walking ? Mathf.InverseLerp(.4f, 2.5f, horizontalVelocity.magnitude)
+            float walkTarget = walking ? Mathf.Lerp(.5f, 1f, Mathf.InverseLerp(.4f, 4.5f, horizontalVelocity.magnitude))
                 : turningInPlace ? .65f : 0f;
             walkBlend = Mathf.MoveTowards(walkBlend, walkTarget, Time.fixedDeltaTime * 6f);
+            UpdateMotionPosture(normalTurning && !jumping && !turningInPlace,
+                supported, rootBody.linearVelocity);
             float actionStrength = ActionStrength(clip);
             if (clip != lastActionClip)
             {
@@ -633,7 +641,7 @@ namespace GoatDescent
             eagleLift = Mathf.MoveTowards(eagleLift,
                 linked && Time.time < eagleTugUntil ? .2f : 0f, Time.fixedDeltaTime * .8f);
             if (pelvisJoint)
-                pelvisJoint.connectedAnchor = pelvisBaseAnchor + Vector3.up * (groundLift + eagleLift);
+                pelvisJoint.connectedAnchor = pelvisBaseAnchor + Vector3.up * (groundLift + eagleLift + motionLift);
             if (supported) lastSupportedAt = Time.time;
             // While the gameplay capsule is supported, proxy colliders can
             // hook into the terrain during a turn and flip the whole rig.
@@ -854,9 +862,19 @@ namespace GoatDescent
                         walkingSway = Quaternion.Euler(Mathf.Sin(phase * 2f) * amplitude * .45f,
                             Mathf.Sin(phase) * amplitude * .5f, Mathf.Cos(phase) * amplitude * .35f);
                     }
+                    else if (walking && !turningInPlace)
+                    {
+                        // The shoulders and haunches settle a fraction apart,
+                        // instead of rocking the whole torso as one rigid block.
+                        float phaseOffset = part.Bone.name == "Pelvis" ? .65f
+                            : part.Bone.name == "ElasticMid" ? .35f : 0f;
+                        walkingSway = Quaternion.Euler(
+                            Mathf.Sin(walkPhase * 2f + phaseOffset) * 1.3f * walkBlend,
+                            0f, Mathf.Sin(walkPhase + phaseOffset) * .6f * walkBlend);
+                    }
                     desired = Quaternion.AngleAxis(yawLead, Vector3.up) * rootBody.rotation
-                        * Quaternion.AngleAxis(groundRoll * lean, Vector3.forward)
-                        * Quaternion.AngleAxis(groundLean * lean, Vector3.right)
+                        * Quaternion.AngleAxis((groundRoll + motionRoll) * lean, Vector3.forward)
+                        * Quaternion.AngleAxis((groundLean + motionPitch) * lean, Vector3.right)
                         * walkingSway
                         * part.RestRotation;
                 }
@@ -882,6 +900,14 @@ namespace GoatDescent
                     else if (part.Bone.name == "Head") desired *= Quaternion.Euler(-8f * bleat + nerves.ShockPose * 8f,
                         Mathf.Sin(Time.time * 24) * bleat * 2.5f, nerves.ShockPose * 4f);
                 }
+                // Feed expression accents through the muscles so the rendered head
+                // stays attached to its physical body and the staged turn is preserved.
+                var emotion = GetComponent<GoatEmotionController>();
+                if (emotion && supported && !linked && !carried && !riding && !pretending)
+                {
+                    if (part.Bone.name == "Head") desired *= Quaternion.Euler(emotion.HeadEuler);
+                    else if (part.Bone.name == "Neck") desired *= Quaternion.Euler(emotion.HeadEuler * .3f);
+                }
                 Quaternion difference = desired * Quaternion.Inverse(part.Body.rotation);
                 difference.ToAngleAxis(out float angle, out Vector3 axis);
                 if (angle > 180f) angle -= 360f;
@@ -889,6 +915,11 @@ namespace GoatDescent
                 float stiffness = part.Spring * compliance
                     * (part.IsLeg && supported ? Mathf.Lerp(1f, 1.6f, walkBlend) : 1f)
                     * (supported ? Mathf.Lerp(1f, part.IsLeg ? 1.7f : 1.2f, actionBlend) : 1f);
+                // Faster steps need quicker muscles as well as a faster clip;
+                // otherwise the damped legs barely lift at a trot.
+                if (part.IsLeg && walking && !turningInPlace)
+                    stiffness *= Mathf.Lerp(1f, 2.1f, Mathf.InverseLerp(1.5f, 5.35f,
+                        visual ? visual.LocomotionSpeed : horizontalVelocity.magnitude));
                 if (supportedTorso && stagedTurn)
                     stiffness *= firstPersonTurning ? 3f : 1.5f;
                 float damping = (jumping && beer ? beer.JumpDamping : walkingStance ? tuning.groundedDamping : tuning.airborneDamping) * Mathf.Sqrt(stiffness);
@@ -900,6 +931,37 @@ namespace GoatDescent
                     tuning.maxMuscleAcceleration * (supportedTorso && stagedTurn && firstPersonTurning ? 1.5f : 1f)),
                     ForceMode.Acceleration);
             }
+        }
+
+        private void UpdateMotionPosture(bool locomotion, bool supported, Vector3 velocity)
+        {
+            float dt = Time.fixedDeltaTime;
+            Vector3 acceleration = (velocity - previousMotionVelocity) / Mathf.Max(dt, .001f);
+            if (supported && !motionWasSupported && locomotion)
+                landingCompression = Mathf.Max(landingCompression,
+                    Mathf.InverseLerp(1.5f, 9f, -previousMotionVelocity.y));
+            previousMotionVelocity = velocity;
+            motionWasSupported = supported;
+            landingCompression = Mathf.MoveTowards(landingCompression, 0f, dt * 3.5f);
+            float pitch = 0f, roll = 0f, lift = 0f;
+            if (locomotion)
+            {
+                Vector3 localAcceleration = Quaternion.Inverse(rootBody.rotation) * acceleration;
+                // Haunches take the push-off; shoulders absorb braking. The head
+                // receives less of this tilt, keeping the gaze steady.
+                pitch = Mathf.Clamp(-localAcceleration.z * .24f, -4.5f, 5.5f);
+                roll = Mathf.Clamp(-localAcceleration.x * .3f, -5f, 5f);
+                float moving = Mathf.InverseLerp(.2f, 2f,
+                    Vector3.ProjectOnPlane(velocity, Vector3.up).magnitude) * walkBlend;
+                pitch += Mathf.Sin(walkPhase * 2f - .45f) * .9f * moving;
+                roll += Mathf.Sin(walkPhase) * 1.2f * moving;
+                lift = (1f - Mathf.Cos(walkPhase * 2f)) * .012f * moving
+                    - landingCompression * .055f;
+            }
+            float response = 1f - Mathf.Exp(-12f * dt);
+            motionPitch = Mathf.Lerp(motionPitch, pitch, response);
+            motionRoll = Mathf.Lerp(motionRoll, roll, response);
+            motionLift = Mathf.Lerp(motionLift, lift, response);
         }
 
         private void GetGroundPosture(out float lean, out float roll, out float lift)
@@ -1041,7 +1103,8 @@ namespace GoatDescent
             if (!initialized) return;
             // Animation may still move ears/tail/facial bones. The weighted body
             // bones always take their final positions from the physics solver.
-            bool sampleWalk = visual && (visual.CurrentClip == "Goat_Walk" || turningInPlace);
+            bool sampleWalk = visual && (visual.CurrentClip == "Goat_Walk" || turningInPlace
+                || visual.CurrentClip == "Goat_Idle" && walkBlend > .001f);
             if(sampleWalk)
             {
                 PrepareWalkSampler();
@@ -1050,7 +1113,7 @@ namespace GoatDescent
                 {
                     float walkTime=turningInPlace && visual.CurrentClip != "Goat_Walk"
                         ? Mathf.Repeat(turnWalkTime,walkClip.length)
-                        : Mathf.Repeat(animation["Goat_Walk"].time,walkClip.length);
+                        : visual.WalkCycleTime * walkClip.length;
                     walkPhase=walkTime/walkClip.length*Mathf.PI*2f;
                     walkClip.SampleAnimation(walkAnimationRoot,walkTime);
                 }
@@ -1117,6 +1180,9 @@ namespace GoatDescent
             lastSupportedAt = Time.time;
             walkBlend = 0f;
             walkPhase = 0f;
+            previousMotionVelocity = rootBody.linearVelocity;
+            motionWasSupported = false;
+            motionPitch = motionRoll = motionLift = landingCompression = 0f;
             turnStepUntil = 0f;
             turnWalkTime = 0f;
             turnStartedAt = -100f;

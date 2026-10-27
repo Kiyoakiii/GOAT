@@ -9,6 +9,8 @@ namespace GoatDescent
         [SerializeField,Range(0f,Maximum)] private float current=Maximum;
         public float Current => current;
         public float Fraction => current/Maximum;
+        // No penalty at 50 HP or above; healing immediately reduces the strain.
+        public float Injury01 => Mathf.Clamp01((50f - current) / 50f);
         public void Damage(float amount)
         {
             if(!MountainAuthority.IsHost || amount<=0f) return;

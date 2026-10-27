@@ -40,6 +40,7 @@ Shader "GoatDescent/First Person Body"
         #pragma multi_compile_local _ _ALPHATEST_ON
         #pragma multi_compile_local _ _EMISSION
         #include "UnityStandardUtils.cginc"
+        #include "GoatFurShading.cginc"
         sampler2D _MainTex, _BumpMap, _MetallicGlossMap, _OcclusionMap, _EmissionMap;
         sampler2D _CoatMask;
         fixed4 _SkinColor;
@@ -53,6 +54,7 @@ Shader "GoatDescent/First Person Body"
             UNITY_INITIALIZE_OUTPUT(Input, result);
             result.tint = vertex.color;
             result.limb = vertex.texcoord2.x;
+            result.tint.a = vertex.texcoord1.x;
             vertex.vertex.xyz += vertex.normal * (_StaticFurOffset * _FurLayer);
         }
         void surf(Input input, inout SurfaceOutputStandard output)
@@ -72,7 +74,7 @@ Shader "GoatDescent/First Person Body"
             #ifdef _ALPHATEST_ON
                 clip(color.a - _Cutoff);
             #endif
-            output.Albedo = color.rgb * lerp(fixed3(1,1,1), input.tint.rgb, _UseVertexColor);
+            output.Albedo = lerp(color.rgb, GoatFurColor(color.rgb, input.tint.rgb, input.tint.a), _UseVertexColor);
             #ifdef _NORMALMAP
                 output.Normal = UnpackScaleNormal(tex2D(_BumpMap, input.uv_MainTex), _BumpScale);
             #endif

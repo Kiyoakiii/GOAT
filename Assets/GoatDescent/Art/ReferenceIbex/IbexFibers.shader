@@ -3,6 +3,7 @@ Shader "GoatDescent/Ibex Fibers"
     Properties
     {
         _Color("Coat tint", Color) = (1,1,1,1)
+        _MainTex("Coat color at strand root", 2D) = "white" {}
         _FurLayer("Fur layer", Float) = 1
         _FurGrowth("Coat regrowth", Range(0,1)) = 1
         _StaticCharge("Static charge", Range(0,1)) = 0
@@ -16,13 +17,16 @@ Shader "GoatDescent/Ibex Fibers"
         CGPROGRAM
         #pragma surface surf Standard fullforwardshadows vertex:vert addshadow
         #pragma target 3.0
-        struct Input { float4 tint; };
+        #include "../../Resources/GoatFurShading.cginc"
+        struct Input { float4 tint; float2 uv_MainTex; };
+        sampler2D _MainTex;
         fixed4 _Color;
         float _FurGrowth, _StaticCharge, _StaticFurOffset;
         void vert(inout appdata_full vertex, out Input result)
         {
             UNITY_INITIALIZE_OUTPUT(Input, result);
             result.tint = vertex.color;
+            result.tint.a = vertex.texcoord1.x;
             vertex.vertex.xyz += vertex.normal * _StaticFurOffset;
         }
         void surf(Input input, inout SurfaceOutputStandard output)
@@ -32,9 +36,9 @@ Shader "GoatDescent/Ibex Fibers"
                 clip(_FurGrowth - .00001);
                 clip(_FurGrowth - min(.9999, frac(dot(input.tint.rgb, float3(131.1, 47.7, 91.3)))));
             }
-            output.Albedo = input.tint.rgb * _Color.rgb;
+            output.Albedo = GoatFurColor(tex2D(_MainTex, input.uv_MainTex).rgb * _Color.rgb, input.tint.rgb, input.tint.a);
             output.Metallic = 0;
-            output.Smoothness = 0.08;
+            output.Smoothness = .18;
             output.Alpha = 1;
         }
         ENDCG

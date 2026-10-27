@@ -19,6 +19,8 @@ namespace GoatDescent
         private GameObject effects;
         private readonly Vector3[] streamPoints=new Vector3[24];
         public bool Active => kind!=GoatToiletKind.None;
+        public GoatToiletKind Kind => kind;
+        public float Progress => Active && duration > 0f ? Mathf.Clamp01(Elapsed / duration) : 0f;
         public float Elapsed => Active ? Mathf.Max(0f,Time.time-started) : 0f;
         public float Crouch01 => kind==GoatToiletKind.Poop ? PoseBlend : 0f;
         private float PoseBlend => Mathf.Min(Mathf.SmoothStep(0,1,Elapsed/.75f),Mathf.SmoothStep(0,1,(duration-Elapsed)/.7f));

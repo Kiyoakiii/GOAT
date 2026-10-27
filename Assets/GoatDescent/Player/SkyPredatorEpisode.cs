@@ -7,7 +7,7 @@ namespace GoatDescent
     [DefaultExecutionOrder(150)]
     public sealed class SkyPredatorEpisode : MonoBehaviour
     {
-        private enum FlightPhase : byte { Circling, Approaching, Diving, Struggling, Looping, Carrying, Returning, KnockedBack, Inspecting }
+        private enum FlightPhase : byte { Circling, Approaching, Diving, Struggling, Looping, Carrying, Returning, KnockedBack, Inspecting, WindApproaching, WindGusting }
 
         private sealed class Bird
         {
@@ -15,6 +15,10 @@ namespace GoatDescent
             public Transform Root;
             public Transform LeftWing;
             public Transform RightWing;
+            public Transform Visual;
+            public EagleWindRibbons Wind;
+            public EagleHoverHead HoverHead;
+            public float HoverBlend, WindBlend;
             public Vector3 SnapshotPosition;
             public Quaternion SnapshotRotation;
             public bool ImpactVisible;
@@ -41,6 +45,8 @@ namespace GoatDescent
                     case FlightPhase.Carrying: return $"{hunter} УНОСИТ КОЗЛА {targetId} В НЕБО!";
                     case FlightPhase.KnockedBack: return $"{hunter} ПОЛУЧИЛ КОПЫТОМ — ПЕРЬЯ ЛЕТЯТ!";
                     case FlightPhase.Inspecting: return $"{hunter} ПРОВЕРЯЕТ КОЗЛА {targetId} — НЕ ШЕВЕЛИСЬ!";
+                    case FlightPhase.WindApproaching: return $"{hunter} ГОТОВИТ ПОРЫВ ВЕТРА!";
+                    case FlightPhase.WindGusting: return $"{hunter} СДУВАЕТ КОЗЛА {targetId} — УПРИСЬ КОПЫТАМИ!";
                     case FlightPhase.Returning: return $"{hunter} ВОЗВРАЩАЕТСЯ К СТАЕ";
                     default: return "";
                 }
@@ -79,6 +85,8 @@ namespace GoatDescent
         private Vector3 inspectionPoint;
         private bool inspectionLanded;
         private const float RecoilDuration = 1.65f;
+        private const float WindDuration = 4.6f;
+        private Vector3 windHoverPoint, windDirection;
 
         private void Awake() => Current = this;
 
@@ -88,7 +96,78 @@ namespace GoatDescent
                 || !MountainAuthority.IsHost || !Input.GetKeyDown(KeyCode.F12)) return;
             var pair = LocalGoatPair.Instance;
             if (pair && pair.Active && (!pair.NetworkMode || pair.Active == pair.Primary))
-                ForceAttack(pair.Active);
+            {
+                if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) ForceWindAttack(pair.Active);
+                else ForceAttack(pair.Active);
+            }
+        }
+
+        public bool ForceWindAttack(GoatController goat)
+        {
+            if (!MountainAuthority.IsHost || !initialized || !ValidTarget(goat)
+                || carried || phase == FlightPhase.KnockedBack) return false;
+            return BeginWindAttack(goat, ClosestBirdTo(goat.transform.position), Time.time);
+        }
+
+        private bool BeginWindAttack(GoatController goat, int index, float now)
+        {
+            Vector3 front = Vector3.ProjectOnPlane(goat.transform.forward, Vector3.up).normalized;
+            Vector3 hover = goat.transform.position + front * 4.2f + Vector3.up * 1.9f;
+            if (!ClearFlightPath(hover, goat.transform.position + Vector3.up * 1.2f)) return false;
+            target = goat; targetId = GoatId(goat); activeBirdIndex = index;
+            attackOutward = front; windHoverPoint = hover; manualAttack = false; attemptNumber = 0;
+            flightCeilingY = Mathf.Max(summitHeight + 14f, hover.y + 10f, birds[index].Root.position.y + 4f);
+            approachStage = ClearFlightPath(birds[index].Root.position, hover) ? 2 : 0;
+            phase = FlightPhase.WindApproaching; phaseStarted = now; phaseUntil = now + 12f;
+            return true;
+        }
+
+        private static float WindEnvelope(float age)
+            => Mathf.SmoothStep(0, 1, (age - .55f) / .45f)
+                * (1f - Mathf.SmoothStep(0, 1, (age - WindDuration + .65f) / .65f));
+
+        private void AdvanceWind(float now)
+        {
+            if (!ValidTarget(target) || target.GetComponent<GoatComedyActions>()?.PlayingDead == true)
+            { BeginReturn(now); return; }
+            var bird = birds[activeBirdIndex];
+            if (phase == FlightPhase.WindApproaching)
+            {
+                if (now >= phaseUntil) { BeginReturn(now); return; }
+                Vector3 point = target.transform.position + attackOutward * 4.2f + Vector3.up * 1.9f;
+                if (!ClearFlightPath(point, target.transform.position + Vector3.up * 1.2f))
+                { BeginReturn(now); return; }
+                if (approachStage == 0)
+                {
+                    if (FlyToward(new Vector3(bird.Root.position.x, flightCeilingY, bird.Root.position.z), FlightSpeed)) approachStage = 1;
+                    return;
+                }
+                if (approachStage == 1)
+                {
+                    if (FlyToward(new Vector3(point.x, flightCeilingY, point.z), FlightSpeed)) approachStage = 2;
+                    return;
+                }
+                if (!ClearFlightPath(bird.Root.position, point)) { BeginReturn(now); return; }
+                if (!FlyToward(point, FlightSpeed * .7f)) return;
+                windHoverPoint = point;
+                windDirection = Vector3.ProjectOnPlane(target.transform.position - point, Vector3.up).normalized;
+                phase = FlightPhase.WindGusting; phaseStarted = now; phaseUntil = now + WindDuration;
+            }
+            float age = now - phaseStarted;
+            SetBirdPose(activeBirdIndex, windHoverPoint + Vector3.up * (Mathf.Sin(age * 10.5f) * .055f), windDirection);
+            // Commit to a lane: the goat can step sideways out of the stream.
+            Vector3 chest = target.transform.position + Vector3.up * 1.2f;
+            Vector3 offset = chest - bird.Root.position;
+            float distance = Vector3.Dot(offset, windDirection);
+            Vector3 radial = offset - windDirection * distance;
+            if (distance > .5f && distance < 7f && radial.magnitude < 1.8f
+                && ClearPath(bird.Root.position, chest))
+            {
+                float pulse = .65f + .35f * Mathf.Max(0, Mathf.Cos(age * 10.5f));
+                float falloff = 1f - Mathf.SmoothStep(0, 1, (distance - 5f) / 2f);
+                target.ApplyWind(windDirection * (.75f * pulse * WindEnvelope(age) * falloff));
+            }
+            if (now >= phaseUntil) BeginReturn(now);
         }
 
         /// <summary>Debug shortcut: launch a hunt from the flock toward the specified goat.</summary>
@@ -142,7 +221,13 @@ namespace GoatDescent
             root.transform.SetParent(transform);
             var bird = new Bird { Id = $"SKY-{index + 1:00}", Root = root.transform,
                 PatrolCenter=center,PatrolOutward=outward };
-            CartoonEagleVisual.Build(root.transform, materials, index, out bird.LeftWing, out bird.RightWing);
+            bird.Visual = new GameObject("Articulated hover posture").transform;
+            bird.Visual.SetParent(root.transform, false);
+            CartoonEagleVisual.Build(bird.Visual, materials, index, out bird.LeftWing, out bird.RightWing);
+            bird.HoverHead = bird.Visual.gameObject.AddComponent<EagleHoverHead>();
+            var wind = new GameObject("Eagle wind stream");
+            wind.transform.SetParent(root.transform, false);
+            bird.Wind = wind.AddComponent<EagleWindRibbons>();
             return bird;
         }
 
@@ -240,6 +325,10 @@ namespace GoatDescent
                     break;
                 case FlightPhase.Inspecting:
                     AdvanceInspection(now);
+                    break;
+                case FlightPhase.WindApproaching:
+                case FlightPhase.WindGusting:
+                    AdvanceWind(now);
                     break;
                 case FlightPhase.Returning:
                     AdvanceReturn(now);
@@ -467,7 +556,9 @@ namespace GoatDescent
             }
             activeBirdIndex=ClosestBirdTo(candidate.transform.position);
             attention.Started++;attention.WaitingRolls=0;
-            BeginHunt(candidate, activeBirdIndex, false, now);
+            // Alternate the new harassment with the existing capture attack.
+            if (attention.Started % 2 == 0 || !BeginWindAttack(candidate, activeBirdIndex, now))
+                BeginHunt(candidate, activeBirdIndex, false, now);
             Debug.Log($"SKY_PREDATOR_ROLL chance={chance:0.00} value={roll:0.000} lonely={lonely} overdue={overdue} hunt=true bird={birds[activeBirdIndex].Id} target={targetId}");
         }
 
@@ -773,6 +864,14 @@ namespace GoatDescent
                 }
                 bool working = i == activeBirdIndex
                     && (phase == FlightPhase.Diving || phase == FlightPhase.Struggling);
+                bool gusting = i == activeBirdIndex && phase == FlightPhase.WindGusting;
+                float windAge = WindDuration - (MountainAuthority.IsHost ? phaseUntil - Time.time : networkSecondsLeft);
+                bird.HoverBlend = Mathf.MoveTowards(bird.HoverBlend, gusting ? 1f : 0f, Time.deltaTime * 3f);
+                bird.Visual.localRotation = Quaternion.Euler(-65f * bird.HoverBlend, 0, 0);
+                bird.HoverHead.SetHover(bird.HoverBlend);
+                bird.WindBlend = Mathf.MoveTowards(bird.WindBlend,
+                    gusting ? WindEnvelope(windAge) * (.8f + .2f * Mathf.Cos(windAge * 10.5f)) : 0f, Time.deltaTime * 4f);
+                bird.Wind.SetFlow(bird.Root.position, bird.Root.rotation, bird.WindBlend, Time.time);
                 float flap = Mathf.Sin(Time.time * (working ? 13f : 5f) + i * 1.4f) * 16f;
                 bool stunned = i == activeBirdIndex && phase == FlightPhase.KnockedBack;
                 float progress = MountainAuthority.IsHost
@@ -780,6 +879,7 @@ namespace GoatDescent
                     : Mathf.Clamp01(1f - networkSecondsLeft / RecoilDuration);
                 float raised = stunned ? 70f * (1f - Mathf.SmoothStep(0, 1, progress)) : 0f;
                 float wingAngle = Mathf.Lerp(flap, -raised, stunned ? 1f - progress : 0f);
+                if (gusting) wingAngle = Mathf.Lerp(wingAngle, Mathf.Sin(windAge * 10.5f) * 52f - 8f, bird.HoverBlend);
                 if (i == activeBirdIndex && phase == FlightPhase.Inspecting)
                 {
                     bool checking = MountainAuthority.IsHost ? inspectionLanded : networkSecondsLeft < 3f;

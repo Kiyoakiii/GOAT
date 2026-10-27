@@ -98,7 +98,9 @@ namespace GoatDescent.Editor
             horns.SetFloat("_Glossiness",.27f);
             var fibers=Material("LegacyAppearance/Ibex_Fibers","GoatDescent/Ibex Fibers");
             var whiteFibers=Material("LegacyAppearance/IbexWhite_Fibers","GoatDescent/Ibex Fibers");
-            whiteFibers.color=new Color(8.4f,9f,9.6f,1f);
+            fibers.color=whiteFibers.color=Color.white;
+            fibers.mainTexture=coat.mainTexture;
+            whiteFibers.mainTexture=white.mainTexture;
             var original=AssetDatabase.LoadAssetAtPath<GameObject>(Art+"/ReferenceIbexWhite.fbx")
                 .GetComponentInChildren<SkinnedMeshRenderer>();
             foreach(int number in new[]{11,12})

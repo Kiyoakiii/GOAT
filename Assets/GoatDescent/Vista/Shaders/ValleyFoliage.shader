@@ -20,6 +20,7 @@ Shader "GoatDescent/Valley Foliage"
         #pragma target 3.0
         fixed4 _Color, _LeafDark, _LeafLight, _RimColor;
         float _RampSteps, _RimStrength, _SwayAmount, _SwayFrequency;
+        float4 _GoatWeatherWind;
         struct Input { float3 worldPos; float4 color : COLOR; };
 
         void vert(inout appdata_full v)
@@ -30,6 +31,8 @@ Shader "GoatDescent/Valley Foliage"
             float sway = sin(phase) + .5 * sin(phase * 1.73 + 1.3);
             v.vertex.x += sway * _SwayAmount;
             v.vertex.z += sway * _SwayAmount * .6;
+            float3 wind = mul((float3x3)unity_WorldToObject, _GoatWeatherWind.xyz);
+            v.vertex.xyz += wind * _SwayAmount * _GoatWeatherWind.w * (1.3 + sway * 1.2);
         }
 
         half4 LightingToonFoliage(SurfaceOutput s, half3 lightDir, half3 viewDir, half atten)

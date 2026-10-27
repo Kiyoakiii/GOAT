@@ -17,6 +17,7 @@ namespace GoatDescent
         private sealed class BodyPart
         {
             public SkinnedMeshRenderer Source, Body;
+            public Mesh SourceMesh;
         }
 
         private readonly List<BodyPart> parts = new List<BodyPart>();
@@ -68,7 +69,10 @@ namespace GoatDescent
         public void Configure(GoatController goat, bool firstPerson)
         {
             int number = goat ? goat.GetComponent<GoatSkin>()?.Number ?? 0 : -100;
-            if (owner != goat || skinNumber != number)
+            bool meshChanged = false;
+            foreach (var part in parts)
+                if (part.Source && part.Source.sharedMesh != part.SourceMesh) { meshChanged = true; break; }
+            if (owner != goat || skinNumber != number || meshChanged)
             {
                 ClearBody();
                 owner = goat; skinNumber = number;
@@ -127,7 +131,7 @@ namespace GoatDescent
                 body.probeAnchor = source.probeAnchor;
                 body.allowOcclusionWhenDynamic = false;
                 body.enabled = false;
-                parts.Add(new BodyPart { Source = source, Body = body });
+                parts.Add(new BodyPart { Source = source, Body = body, SourceMesh = source.sharedMesh });
             }
             if (head)
                 foreach (var renderer in renderers)
@@ -149,7 +153,7 @@ namespace GoatDescent
             bool fibers = source.shader && source.shader.name == "GoatDescent/Ibex Fibers";
             result.SetFloat("_UseVertexColor", fibers ? 1f : 0f);
             result.SetFloat("_Cull", fibers ? 0f : 2f);
-            if (fibers) { result.SetFloat("_Glossiness", .08f); result.SetFloat("_Metallic", 0f); }
+            if (fibers) { result.SetFloat("_Glossiness", .18f); result.SetFloat("_Metallic", 0f); }
             materials.Add(source, result);
             return result;
         }

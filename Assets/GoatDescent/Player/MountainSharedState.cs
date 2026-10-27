@@ -13,7 +13,7 @@ namespace GoatDescent
     [Serializable]
     public sealed class MountainSnapshot
     {
-        public const int CurrentSchema = 16;
+        public const int CurrentSchema = 17;
         public int sequence;
         public int schema;
         public string mapSignature;
@@ -23,6 +23,7 @@ namespace GoatDescent
         public LooseState[] loose;
         public BellState[] bellsState;
         public BirdState[] birds;
+        public WeatherState weather;
         public GoatState[] goats;
         public ChestState chest;
         public SupplyChestState supplies;
@@ -33,6 +34,15 @@ namespace GoatDescent
         public bool completed;
         public int falls;
         public int bells;
+    }
+
+    [Serializable]
+    public struct WeatherState
+    {
+        public bool active;
+        public byte preset;
+        public float rain, wetness, wind, clock;
+        public Vector3 direction;
     }
 
     [Serializable]

@@ -3,6 +3,7 @@ using UnityEngine;
 namespace GoatDescent
 {
     [RequireComponent(typeof(Rigidbody), typeof(GoatGroundDetector))]
+    [RequireComponent(typeof(GoatWeatherResponse))]
     public sealed class GoatController : MonoBehaviour
     {
         private GoatMechanicsSettings tuning;
@@ -20,9 +21,17 @@ namespace GoatDescent
         private Vector2 input;
         private Vector3 moveDirection;
         private float externalImpulseUntil;
+        private Vector3 windDrift;
+        private float windUntil;
+        public void ApplyWind(Vector3 drift)
+        {
+            windDrift = Vector3.ClampMagnitude(drift, 1f);
+            windUntil = Time.time + .1f;
+        }
         private GoatInteraction interaction;
         private GoatGripController grip;
         private GoatSlopeBalance balance;
+        private GoatWeatherResponse weatherResponse;
         private Vector3 remoteMove;
         private bool remoteBrake, remoteSuperHooves, remoteFirstPerson;
         private float remoteHorizontal, remoteVertical;
@@ -87,6 +96,10 @@ namespace GoatDescent
         public Vector3 Velocity => !MountainAuthority.IsHost ? networkVelocity : body ? body.linearVelocity : Vector3.zero;
         public bool Grounded => ground && ground.IsGrounded;
         public Vector3 MoveDirection => moveDirection;
+        public bool IsBackingUp => HasMovementInput && VerticalInput < -.1f;
+        // Travel and facing are different when retreating. Keep MoveDirection
+        // as the actual travel direction for jumps and the mountain mechanics.
+        public Vector3 MovementFacing => IsBackingUp ? -moveDirection : moveDirection;
         public bool HasMovementInput => NetworkOwnedByRemote
             ? remoteMove.sqrMagnitude > .0001f : input.sqrMagnitude > .0001f;
         public bool IsBracingForJump { get; set; }
@@ -95,6 +108,7 @@ namespace GoatDescent
         public void ReceiveImpulse(Vector3 impulse, float recoverySeconds)
         {
             CacheComponents();
+            if (impulse.magnitude > 8f) GetComponent<GoatEmotionController>()?.ReactToImpact(impulse.magnitude / 45f);
             externalImpulseUntil = Mathf.Max(externalImpulseUntil, Time.time + recoverySeconds);
             body.AddForce(impulse, ForceMode.Impulse);
         }
@@ -110,6 +124,7 @@ namespace GoatDescent
             interaction ??= GetComponent<GoatInteraction>();
             grip ??= GetComponent<GoatGripController>();
             balance ??= GetComponent<GoatSlopeBalance>();
+            weatherResponse ??= GetComponent<GoatWeatherResponse>();
         }
 
         private void Start() { cameraTransform = Camera.main ? Camera.main.transform : null; Cursor.lockState = CursorLockMode.Locked; }
@@ -135,13 +150,17 @@ namespace GoatDescent
                 || GetComponent<GoatToiletAction>()?.Active == true
                 || GetComponent<GoatComedyActions>()?.BlocksMovement == true
                 || GetComponent<GoatPunchBuff>()?.PerformingPair == true) return;
-            if (!NetworkOwnedByRemote && !GoatLocalControl.AllowsInput(this)) return;
+            bool canDrive = NetworkOwnedByRemote || GoatLocalControl.AllowsInput(this);
+            Vector3 wind = Time.time < windUntil ? windDrift : Vector3.zero;
+            if (weatherResponse) wind += weatherResponse.Wind;
+            if (!canDrive && wind.sqrMagnitude < .001f) return;
             if (cliffGrip && cliffGrip.IsGripping) return;
             if (body.isKinematic || (grip && grip.SuperActive) || (balance && balance.IsSlipping)) return;
             cameraTransform ??= Camera.main ? Camera.main.transform : null;
             Vector3 forward = cameraTransform ? Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized : Vector3.forward;
             Vector3 right = cameraTransform ? Vector3.ProjectOnPlane(cameraTransform.right, Vector3.up).normalized : Vector3.right;
             Vector3 desired = NetworkOwnedByRemote ? remoteMove : forward * input.y + right * input.x;
+            if (!canDrive) desired = Vector3.zero;
             if (desired.sqrMagnitude > 1f) desired.Normalize();
             moveDirection = Vector3.ProjectOnPlane(desired, Vector3.up).normalized;
             if (!ground.IsGrounded)
@@ -150,6 +169,7 @@ namespace GoatDescent
                 if (desired.sqrMagnitude > .01f)
                     body.AddForce(desired * airAcceleration * (interaction && interaction.IsLinked ? .12f : 1f),
                         ForceMode.Acceleration);
+                body.AddForce(wind, ForceMode.Acceleration);
                 return;
             }
             Vector3 surfaceNormal = ground.IsGrounded ? ground.GroundNormal : Vector3.up;
@@ -161,6 +181,7 @@ namespace GoatDescent
             {
                 Vector3 facing = Vector3.ProjectOnPlane(body.rotation * Vector3.forward, Vector3.up);
                 Vector3 travel = Vector3.ProjectOnPlane(desired, Vector3.up);
+                if (IsBackingUp) travel = -travel;
                 float turnAngle = Vector3.Angle(facing, travel);
                 float traction = 1f - Mathf.Clamp01((turnAngle - 15f) / 55f);
                 desired *= traction;
@@ -173,10 +194,17 @@ namespace GoatDescent
                 downhillSpeed *= .2f;
             Vector3 downhill = Vector3.ProjectOnPlane(Vector3.down, surfaceNormal).normalized;
             float topSpeed = maxGroundSpeed * (ground.IsGrounded && ground.SlopeAngle > steepGripAngle ? steepSpeedMultiplier : 1f) * (IsBracingForJump && ground.IsGrounded ? .42f : 1f);
+            if (IsBackingUp) topSpeed *= .45f;
             Vector3 velocityOnSurface = Vector3.ProjectOnPlane(body.linearVelocity, surfaceNormal);
             Vector3 wantedVelocity = desired * topSpeed + downhill * downhillSpeed;
+            wantedVelocity += Vector3.ProjectOnPlane(wind, surfaceNormal) * (braking ? .2f : 1f);
             float acceleration = braking ? 32f : Mathf.Lerp(groundAcceleration, 12f,
                 Mathf.InverseLerp(28f, 65f, ground.SlopeAngle));
+            float wetness = weatherResponse ? weatherResponse.Wetness : 0f;
+            acceleration *= Mathf.Lerp(1f, braking ? .35f : .2f, wetness);
+            // Rain also makes gentle inclines slick, not just the steep cliff zone.
+            wantedVelocity += downhill * (wetness * Mathf.InverseLerp(5f, 50f, ground.SlopeAngle)
+                * (braking ? .22f : 1.05f));
             var loose = ground.IsGrounded && ground.GroundHit.collider
                 ? ground.GroundHit.collider.GetComponent<LooseSurface>() : null;
             if (loose) acceleration *= loose.TractionMultiplier;

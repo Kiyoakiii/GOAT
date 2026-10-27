@@ -45,7 +45,8 @@ namespace GoatDescent
                 ledges = new LedgeState[platforms.Length],
                 stones = hazards ? hazards.CaptureStones() : new StoneState[0],
                 loose = hazards ? hazards.CaptureSurfaces() : new LooseState[0],
-                birds = eagles ? eagles.CaptureState() : new BirdState[0]
+                birds = eagles ? eagles.CaptureState() : new BirdState[0],
+                weather = WorldWeather.Current ? WorldWeather.Current.Capture() : default
             };
             snapshot.chest = MadnessChest.Current ? MadnessChest.Current.Capture() : default;
             snapshot.supplies = DescentSupplyChest.Current ? DescentSupplyChest.Current.Capture() : default;
@@ -115,6 +116,7 @@ namespace GoatDescent
             DescentSupplyChest.Apply(snapshot.supplies);
             BeerPuddle.ApplyAll(snapshot.puddles);
             eagles?.ApplyState(snapshot.birds);
+            if (snapshot.weather.active) WorldWeather.Ensure().Apply(snapshot.weather);
             LocalGoatPair.Instance?.ApplyNetworkScenario(snapshot.scenario);
             LevelOneCave.Current?.Apply(snapshot.players,snapshot.completed);
             if (snapshot.goats == null) return;

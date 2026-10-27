@@ -8,6 +8,7 @@ namespace GoatDescent
     /// Lightweight, replaceable hero-goat model. The stylized meshes are combined
     /// by material so this runtime prototype stays to a small number of draw calls.
     /// </summary>
+    [RequireComponent(typeof(GoatEmotionController))]
     public sealed class GoatVisualController : MonoBehaviour
     {
         private const string VisualName = "VisualRoot — replaceable goat model";
@@ -34,6 +35,10 @@ namespace GoatDescent
         private string networkClip;
         private Vector3 networkFacing;
         private float faceUntil;
+        private float locomotionSpeed;
+        private float walkCycleTime;
+        public float LocomotionSpeed => locomotionSpeed;
+        public float WalkCycleTime => walkCycleTime;
         public Vector3 Facing => visual ? visual.forward : transform.forward;
         public string CurrentClip => string.IsNullOrEmpty(manualActionClip) ? activeAutomaticClip : manualActionClip;
         public void SetJumpPreparation(bool value)
@@ -53,6 +58,7 @@ namespace GoatDescent
         public void PlayLanding(float impact)
         {
             if (impact >= 7f) PlaySurpriseEarOverlay();
+            if (impact >= 5f) GetComponent<GoatEmotionController>()?.ReactToImpact(impact / 12f);
         }
         public void ApplyNetworkPose(string clip, Vector3 facing)
         {
@@ -315,6 +321,8 @@ namespace GoatDescent
             if (importedAnimation != null && !surpriseEarMaskReady)
                 ConfigureSurpriseEarMask();
 
+            UpdateWalkCycle();
+
             if (!MountainAuthority.IsHost)
             {
                 if (importedAnimation && !string.IsNullOrEmpty(networkClip)
@@ -347,7 +355,8 @@ namespace GoatDescent
                     string clip = goat && goat.IsPredatorCarried ? "Goat_Idle"
                         : ground && !ground.IsGrounded
                             ? "Goat_Jump"
-                            : velocity.sqrMagnitude > .2f ? "Goat_Walk" : "Goat_Idle";
+                            : velocity.sqrMagnitude > (activeAutomaticClip == "Goat_Walk" ? .06f : .16f)
+                                ? "Goat_Walk" : "Goat_Idle";
                     var pair = GetComponent<GoatInteraction>();
                     if (pair && pair.IsLinked && !(goat && goat.IsPredatorCarried))
                     {
@@ -414,6 +423,30 @@ namespace GoatDescent
             }
 
             visual.localScale = Vector3.one;
+        }
+
+        private void UpdateWalkCycle()
+        {
+            var motor = GetComponent<GoatController>();
+            Vector3 velocity = motor ? motor.Velocity : body.linearVelocity;
+            float speed = Vector3.ProjectOnPlane(velocity,
+                ground && ground.IsGrounded ? ground.GroundNormal : Vector3.up).magnitude;
+            locomotionSpeed = Mathf.Lerp(locomotionSpeed, speed, 1f - Mathf.Exp(-14f * Time.deltaTime));
+            AnimationState walk = importedAnimation ? importedAnimation["Goat_Walk"] : null;
+            if (walk == null) return;
+            // Longer strides at speed, rather than replaying the same slow walk
+            // while the root races ahead. Keep phase through brief stops and fades.
+            float stride = Mathf.Lerp(1.15f, 2.35f, Mathf.InverseLerp(.5f, 5.35f, locomotionSpeed));
+            float cyclesPerSecond = Mathf.Min(2.6f, speed / stride);
+            // Follow actual motion, not the pressed key: when W/S changes, the
+            // hooves first finish braking and then step in the new direction.
+            // Velocity also works for remotely rendered goats without local input.
+            if (Vector3.Dot(velocity, transform.forward) < -.1f)
+                cyclesPerSecond = -cyclesPerSecond;
+            if (CurrentClip == "Goat_Walk" && ground && ground.IsGrounded)
+                walkCycleTime = Mathf.Repeat(walkCycleTime + cyclesPerSecond * Time.deltaTime, 1f);
+            walk.speed = cyclesPerSecond * walk.length;
+            walk.time = walkCycleTime * walk.length;
         }
 
         public void PlayNetworkAction(byte action)

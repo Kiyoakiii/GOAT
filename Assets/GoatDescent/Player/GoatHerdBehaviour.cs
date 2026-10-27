@@ -14,7 +14,7 @@ namespace GoatDescent
         public Vector3 groundPoint;
     }
 
-    [DisallowMultipleComponent, DefaultExecutionOrder(30)]
+    [DisallowMultipleComponent, DefaultExecutionOrder(120)]
     public sealed class GoatHerdBehaviour : MonoBehaviour
     {
         private static readonly HashSet<GoatHerdBehaviour> herd = new HashSet<GoatHerdBehaviour>();
@@ -183,11 +183,14 @@ namespace GoatDescent
             }
             if (mouth && head)
             {
-                float opening = BleatPose;
-                mouth.position = nose - head.up * .055f + head.forward * .012f;
+                float opening = Mathf.Max(BleatPose, GetComponent<GoatEmotionController>()?.MouthOpen ?? 0f);
+                bool ibex = GetComponent<GoatSkin>()?.HeadAttachments != null;
+                mouth.position = ibex ? nose + head.rotation * new Vector3(0f, .006f, -.018f)
+                    : nose - head.up * .055f + head.forward * .012f;
                 mouth.rotation = head.rotation;
                 Vector3 scale = head.lossyScale;
-                mouth.localScale = new Vector3(.115f / scale.x, .085f / scale.y, .03f / scale.z) * opening;
+                Vector3 size = ibex ? new Vector3(.105f, .025f, .04f) : new Vector3(.115f, .085f, .03f);
+                mouth.localScale = new Vector3(size.x / scale.x, size.y / scale.y, size.z / scale.z) * opening;
             }
             float flash = Mathf.Clamp01((shockUntil - Time.time) / .45f);
             float amount = Mathf.Max(Charge, flash);

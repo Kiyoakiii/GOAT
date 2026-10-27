@@ -34,7 +34,8 @@ namespace GoatDescent.Editor
             importer.importLights = false;
             importer.addCollider = false;
             importer.meshCompression = ModelImporterMeshCompression.Off;
-            importer.isReadable = false;
+            // The hover pose separates the rigid head pieces once at spawn.
+            importer.isReadable = true;
         }
     }
 }

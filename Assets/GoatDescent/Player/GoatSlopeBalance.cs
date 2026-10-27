@@ -12,6 +12,7 @@ namespace GoatDescent
         private readonly bool[] hoofHolding = new bool[4];
         private Rigidbody body;
         private GoatGroundDetector ground;
+        private GoatHealth health;
         private float fallTime;
         private float catchCooldown;
         private float slipUntil;
@@ -36,6 +37,7 @@ namespace GoatDescent
         {
             body = GetComponent<Rigidbody>();
             ground = GetComponent<GoatGroundDetector>();
+            health = GetComponent<GoatHealth>();
         }
 
         public void ResetBalance()
@@ -126,10 +128,20 @@ namespace GoatDescent
             bool braking = hasInput && controller.WantsBrake;
             float recklessTurn = Mathf.Abs(steering) * Mathf.InverseLerp(4f, 11f, body.linearVelocity.magnitude)
                 * (braking ? .2f : 1f) * .23f;
-            float stability=Mathf.Max(.1f,Tuning.stability*(GetComponent<GoatBeerEffect>()?.StabilityMultiplier??1f));
+            health ??= GetComponent<GoatHealth>();
+            float injury = health ? health.Injury01 : 0f;
+            float healthStability = Mathf.Lerp(1f, .45f, injury);
+            float stability=Mathf.Max(.1f,Tuning.stability*(GetComponent<GoatBeerEffect>()?.StabilityMultiplier??1f)*healthStability);
+            // Injuries make steep footing and rushed/partial support harder.
+            // A safe flat ledge remains a place to rest, and braking still helps.
+            float injurySlopeCost = injury * Mathf.InverseLerp(10f, 65f, ground.SlopeAngle)
+                * (braking ? .176f : .32f);
+            float rainCost = (WorldWeather.Current ? WorldWeather.Current.Wetness : 0f)
+                * Mathf.InverseLerp(8f, 72f, ground.SlopeAngle) * (braking ? .08f : .23f);
             float target = Mathf.Clamp01(1f - (outside * .7f + slopeCost + speedCost
-                + missingCost + recklessTurn)/stability-(1f-Mathf.Min(1f,stability))*.3f);
-            Balance01 = Mathf.MoveTowards(Balance01, target, Time.fixedDeltaTime * Tuning.balanceRecoverySpeed);
+                + missingCost + recklessTurn + injurySlopeCost + rainCost)/stability-(1f-Mathf.Min(1f,stability))*.3f);
+            float recovery = target > Balance01 ? healthStability : 1f;
+            Balance01 = Mathf.MoveTowards(Balance01, target, Time.fixedDeltaTime * Tuning.balanceRecoverySpeed * recovery);
             lean = Mathf.MoveTowards(lean, Mathf.Clamp(-(offset - midpoint) * 38f, -Tuning.maxBalanceLean, Tuning.maxBalanceLean),
                 Time.fixedDeltaTime * 70f);
 
@@ -139,7 +151,7 @@ namespace GoatDescent
                 body.AddForce(right * direction * (Tuning.balanceSlipThreshold - Balance01) * 10f, ForceMode.Acceleration);
             }
             fallTime = Balance01 < Tuning.balanceSlipThreshold ? fallTime + Time.fixedDeltaTime : 0f;
-            if (fallTime > Tuning.balanceSlipDelay && Time.time >= catchCooldown)
+            if (fallTime > Tuning.balanceSlipDelay * Mathf.Lerp(1f, .65f, injury) && Time.time >= catchCooldown)
             {
                 Slip(right, Vector3.ProjectOnPlane(Vector3.down, normal), offset - midpoint);
             }
