@@ -1,6 +1,6 @@
 Shader "Goat Descent/Weather Rain"
 {
-    Properties { _Splash ("Ground ring", Float) = 0 }
+    Properties { _Splash ("Square splash", Float) = 0 }
     SubShader
     {
         Tags { "Queue"="Transparent" "RenderType"="Transparent" "IgnoreProjector"="True" }
@@ -27,10 +27,13 @@ Shader "Goat Descent/Weather Rain"
             fixed4 frag(Varying i):SV_Target
             {
                 float2 p=i.uv*2-1;
-                float drop=pow(saturate(1-abs(p.x)),1.5)*pow(saturate(1-abs(p.y)),.6);
-                float ring=1-smoothstep(.06,.23,abs(length(p)-.65));
+                float shape;
+                if (_Splash > .5)
+                    shape=1-smoothstep(.82,1,max(abs(p.x),abs(p.y)));
+                else
+                    shape=pow(saturate(1-abs(p.x)),1.5)*pow(saturate(1-abs(p.y)),.6);
                 fixed4 c=i.color;
-                c.a*=lerp(drop,ring,saturate(_Splash))*smoothstep(.35,1.2,distance(i.world,_WorldSpaceCameraPos));
+                c.a*=shape*smoothstep(.35,1.2,distance(i.world,_WorldSpaceCameraPos));
                 UNITY_APPLY_FOG(i.fogCoord,c); return c;
             }
             ENDCG
