@@ -633,6 +633,7 @@ namespace GoatDescent
             if (supported && !linked && !carried && !madness && !pretending && !riding)
                 GetGroundPosture(out leanTarget, out rollTarget, out liftTarget);
             if(toilet && toilet.Active) liftTarget-=toilet.Crouch01*.36f;
+            liftTarget -= (GetComponent<GoatRockfallShelter>()?.Protection ?? 0) * .1f;
             if(supported && !linked && !carried && !pretending && !riding && beer?.Intoxicated==true)
                 rollTarget+=Mathf.Sin(Time.time*2.4f+(GetComponent<GoatLocalControl>()?.Label=="B" ? 1.8f : 0f))*beer.SwayDegrees;
             groundLean = Mathf.MoveTowards(groundLean, leanTarget, Time.fixedDeltaTime * 35f);

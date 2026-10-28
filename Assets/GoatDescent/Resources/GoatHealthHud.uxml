@@ -1,5 +1,10 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
   <ui:VisualElement class="health-root">
+    <ui:VisualElement name="rockfallAlert" class="rockfall-alert hidden">
+      <ui:Label name="rockfallTitle" class="rockfall-title" />
+      <ui:Label name="rockfallHint" class="rockfall-hint" />
+      <ui:Label name="rockfallProtection" class="rockfall-protection" />
+    </ui:VisualElement>
     <ui:VisualElement name="healthCard" class="health-card">
       <ui:Label name="healthOwner" text="КОЗЁЛ A  ·  ЗДОРОВЬЕ" class="health-owner" />
       <ui:VisualElement class="health-row">

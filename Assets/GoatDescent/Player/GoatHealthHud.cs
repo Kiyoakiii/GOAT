@@ -9,6 +9,8 @@ namespace GoatDescent
         private PanelSettings panel;
         private VisualElement fill,trail,card;
         private Label value,owner,beer,herdStatus,coatStatus;
+        private VisualElement rockfallAlert;
+        private Label rockfallTitle,rockfallHint,rockfallProtection;
         private float shown=1f,previous=1f;
         private GoatController target;
         private void Start()
@@ -29,11 +31,14 @@ namespace GoatDescent
             card=root.Q("healthCard");fill=root.Q("healthFill");trail=root.Q("healthTrail");
             value=root.Q<Label>("healthValue");owner=root.Q<Label>("healthOwner");beer=root.Q<Label>("beerStatus");
             herdStatus=root.Q<Label>("herdStatus");coatStatus=root.Q<Label>("coatStatus");
+            rockfallAlert=root.Q("rockfallAlert");rockfallTitle=root.Q<Label>("rockfallTitle");
+            rockfallHint=root.Q<Label>("rockfallHint");rockfallProtection=root.Q<Label>("rockfallProtection");
         }
         private void Update()
         {
             if(!document) return;
             var goat=LocalGoatPair.Instance?.Active;
+            UpdateRockfall(goat);
             if(!goat) {card.AddToClassList("hidden");return;}
             card.RemoveFromClassList("hidden");
             var health=goat.GetComponent<GoatHealth>();if(!health) return;
@@ -57,6 +62,27 @@ namespace GoatDescent
             coatStatus.EnableInClassList("hidden",coat<=0);
             int seconds=Mathf.CeilToInt(coat);
             coatStatus.text="ШЕРСТЬ ОТРАСТАЕТ · "+(seconds/60)+":"+(seconds%60).ToString("00");
+        }
+        private void UpdateRockfall(GoatController goat)
+        {
+            if(rockfallAlert==null) return;
+            var fall=RockfallEpisode.Current;
+            bool show=goat && fall && (fall.IsDangerous || fall.Phase==RockfallPhase.Complete && fall.SecondsLeft>0)
+                && fall.InArea(goat.transform.position,35);
+            rockfallAlert.EnableInClassList("hidden",!show);
+            if(!show) return;
+            rockfallTitle.text=fall.Phase==RockfallPhase.Warning ? "КАМНЕПАД ЧЕРЕЗ "+Mathf.CeilToInt(fall.SecondsLeft)+" С"
+                : fall.Phase==RockfallPhase.Falling ? "КАМНЕПАД — К СКАЛЕ!"
+                : fall.Phase==RockfallPhase.Settling ? "ОСТОРОЖНО: ПОСЛЕДНИЕ КАМНИ" : "КАМНЕПАД ЗАКОНЧИЛСЯ";
+            rockfallHint.text=fall.Phase==RockfallPhase.Complete ? "Можно продолжать спуск."
+                : "У скалы остановись и держи Ctrl. Повернись к напарнику и удерживай F — сцепить рога.";
+            var shelter=goat.GetComponent<GoatRockfallShelter>();
+            rockfallProtection.text=fall.Phase==RockfallPhase.Complete || !shelter ? ""
+                : !shelter.NearWall ? "Подойди ближе к скале"
+                : !shelter.Still ? "Не двигайся — закрепись на выступе"
+                : !shelter.Bracing ? "Зажми Ctrl, чтобы сильнее упереться"
+                : goat.GetComponent<GoatInteraction>()?.IsLinked!=true ? "Держи F — сцепись с напарником"
+                : "ДЕРЖИТЕСЬ ВМЕСТЕ · ЗАЩИТА "+Mathf.RoundToInt(shelter.Protection*100)+"%";
         }
         private void OnDestroy() {if(panel) Destroy(panel);}
     }

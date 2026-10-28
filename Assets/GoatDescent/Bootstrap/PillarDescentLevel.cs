@@ -126,7 +126,9 @@ namespace GoatDescent
             RoutePuddle=instance.GetComponent<BeerPuddle>();
         }
 
-        private static float LedgeWidth(int index) => index==PuddleRestIndex ? 6.4f : index%7==4 ? 3.4f : 4.1f;
+        // The middle checkpoint needs room for two goats to brace along one
+        // cliff face without their horn joint pulling either around a corner.
+        private static float LedgeWidth(int index) => index==PuddleRestIndex || index==41 ? 6.4f : index%7==4 ? 3.4f : 4.1f;
 
         private static List<Bounds> GetTreeBounds(Transform pillar)
         {

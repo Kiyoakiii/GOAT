@@ -20,6 +20,7 @@ namespace GoatDescent
         public void Initialize(IReadOnlyList<LandingPlatform> route, Material rock,
             Transform routeProps)
         {
+            gameObject.AddComponent<RockfallEpisode>().Initialize(route, rock);
             int[] stoneSites = { 3, 6, 14, 22, 34, 46, 54, 62 };
             for (int i = 0; i < stoneSites.Length; i++)
             {

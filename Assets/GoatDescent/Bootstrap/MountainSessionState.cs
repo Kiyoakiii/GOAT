@@ -46,7 +46,8 @@ namespace GoatDescent
                 stones = hazards ? hazards.CaptureStones() : new StoneState[0],
                 loose = hazards ? hazards.CaptureSurfaces() : new LooseState[0],
                 birds = eagles ? eagles.CaptureState() : new BirdState[0],
-                weather = WorldWeather.Current ? WorldWeather.Current.Capture() : default
+                weather = WorldWeather.Current ? WorldWeather.Current.Capture() : default,
+                rockfall = RockfallEpisode.Current ? RockfallEpisode.Current.Capture() : default
             };
             snapshot.chest = MadnessChest.Current ? MadnessChest.Current.Capture() : default;
             snapshot.supplies = DescentSupplyChest.Current ? DescentSupplyChest.Current.Capture() : default;
@@ -70,6 +71,7 @@ namespace GoatDescent
             var interaction = goat.GetComponent<GoatInteraction>();
             return new GoatState
             {
+                rockfallShelter = goat.GetComponent<GoatRockfallShelter>()?.Capture() ?? default,
                 herd = goat.GetComponent<GoatHerdBehaviour>()?.Capture() ?? default,
                 coat = goat.GetComponent<GoatFurEffect>()?.Capture() ?? default,
                 drinkingRemaining = goat.GetComponent<GoatWaterDrinking>()?.Remaining ?? 0,
@@ -117,6 +119,7 @@ namespace GoatDescent
             BeerPuddle.ApplyAll(snapshot.puddles);
             eagles?.ApplyState(snapshot.birds);
             if (snapshot.weather.active) WorldWeather.Ensure().Apply(snapshot.weather);
+            if (snapshot.rockfall.active) RockfallEpisode.Current?.Apply(snapshot.rockfall);
             LocalGoatPair.Instance?.ApplyNetworkScenario(snapshot.scenario);
             LevelOneCave.Current?.Apply(snapshot.players,snapshot.completed);
             if (snapshot.goats == null) return;
@@ -125,6 +128,7 @@ namespace GoatDescent
             {
                 var goat = state.id == "A" ? pair?.Primary : state.id == "B" ? pair?.Secondary : null;
                 if (!goat) continue;
+                goat.GetComponent<GoatRockfallShelter>()?.Apply(state.rockfallShelter);
                 if(!(goat.GetComponent<GoatLocalControl>()?.IsControlled??false))
                     goat.GetComponent<GoatSkin>()?.Set(state.skinNumber);
                 var body = goat.GetComponent<Rigidbody>();

@@ -4,6 +4,7 @@ namespace GoatDescent
 {
     [RequireComponent(typeof(Rigidbody), typeof(GoatGroundDetector))]
     [RequireComponent(typeof(GoatWeatherResponse))]
+    [RequireComponent(typeof(GoatRockfallShelter))]
     public sealed class GoatController : MonoBehaviour
     {
         private GoatMechanicsSettings tuning;

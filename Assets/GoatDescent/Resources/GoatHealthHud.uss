@@ -14,3 +14,7 @@
 .herd-status { color: rgb(48,93,126); font-size: 12px; -unity-font-style: bold; margin-top: 5px; white-space: normal; }
 .coat-status { color: rgb(150,87,65); font-size: 12px; -unity-font-style: bold; margin-top: 5px; white-space: normal; }
 .hidden { display: none; }
+.rockfall-alert { position: absolute; top: 24px; left: 23%; right: 23%; background-color: rgba(38,32,29,.94); border-width: 2px; border-color: rgb(227,174,99); border-radius: 12px; padding: 12px 18px; }
+.rockfall-title { color: rgb(255,207,134); font-size: 22px; -unity-font-style: bold; -unity-text-align: middle-center; white-space: normal; }
+.rockfall-hint { color: rgb(243,235,218); font-size: 15px; white-space: normal; -unity-text-align: middle-center; margin-top: 4px; }
+.rockfall-protection { color: rgb(158,219,191); font-size: 15px; -unity-font-style: bold; white-space: normal; -unity-text-align: middle-center; margin-top: 6px; }
