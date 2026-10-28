@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8320bde72d7f9ea499a6ba4f9b57e4b6, type: 3}
+  m_Name: GoatHerdSettings
+  m_EditorClassIdentifier: GoatDescent.Player::GoatDescent.GoatHerdSettings
+  separationDistance: 10
+  reunionDistance: 8.5
+  graceSeconds: 5
+  normalHuntChance: 0.1
+  lonelyHuntChance: 0.4
+  lonelyTargetWeight: 4
+  maxHuntRollsWithoutAttack: 4
+  quietToInhaleSeconds: 4
+  inhaleSeconds: 1.2
+  repeatBleatSeconds: 14
+  fullChargeSeconds: 35
+  minimumShockCharge: 0.25
+  calmDischargePerSecond: 0.0125
+  axeGroundingSeconds: 2
+  shockImpulse: 100
+  gripInterruptSeconds: 0.65
+  drinkingSeconds: 3
+  drinkingReach: 1.1
+  furRegrowthSeconds: 600
+  bareSkinColor: {r: 0.88, g: 0.66, b: 0.55, a: 1}

@@ -74,6 +74,8 @@ namespace GoatDescent
         private void FixedUpdate()
         {
             var controller = GetComponent<GoatController>();
+            if ((GetComponent<GoatDescentTricks>()?.MadnessActive == true || GetComponent<GoatComedyActions>()?.Busy == true))
+            { IsGripping = false; SuperActive = false; return; }
             if (!MountainAuthority.IsHost || (controller && controller.IsPredatorCarried)
                 || !(controller && controller.NetworkOwnedByRemote)
                     && !GoatLocalControl.AllowsInput(this))

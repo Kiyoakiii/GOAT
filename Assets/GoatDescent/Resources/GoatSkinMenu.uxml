@@ -1,0 +1,18 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+  <ui:Style src="GoatSkinMenu.uss" />
+  <ui:VisualElement name="skinRoot" class="skin-root" picking-mode="Ignore">
+    <ui:VisualElement name="overlay" class="overlay">
+      <ui:VisualElement class="skin-panel">
+        <ui:Label text="ВЫБЕРИ СВОЕГО КОЗЛА" class="heading" />
+        <ui:Label text="Горный и серебристый козлы, исходный козёл и выбранные скины." class="subtitle" />
+        <ui:VisualElement name="players" class="players" />
+        <ui:VisualElement name="cards" class="cards" />
+        <ui:VisualElement class="footer">
+          <ui:Label name="selection" class="selection" />
+          <ui:Button name="close" text="Вернуться в игру · M / Esc" class="close-button" />
+        </ui:VisualElement>
+      </ui:VisualElement>
+    </ui:VisualElement>
+    <ui:Button name="open" text="Скины · M" class="open-button" />
+  </ui:VisualElement>
+</ui:UXML>

@@ -200,6 +200,8 @@ MonoBehaviour:
     Warmth: 0.3
     Vignette: 0.35
   levelRecipe: {fileID: 11400000, guid: fcef70f4d82f2a64fb1546175835cec5, type: 2}
+  useGreenPillars: 1
+  useAnimationTestPlatform: 0
 --- !u!4 &264521113
 Transform:
   m_ObjectHideFlags: 0

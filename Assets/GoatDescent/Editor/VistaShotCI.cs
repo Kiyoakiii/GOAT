@@ -11,6 +11,7 @@ namespace GoatDescent.EditorTools
         public static void Shoot()
         {
             string path = "Assets/GoatDescent/Vista/Scenes/ProceduralWorldMilestone.unity";
+            if (!File.Exists(path)) throw new System.InvalidOperationException("This capture targets the retired milestone scene. Use ShootSinglePillar for the existing pillar preview.");
             EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
             int stoneTris = 0, forestTris = 0, branchTris = 0, renderers = 0, shadowCasters = 0;
             foreach (var r in Object.FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None))

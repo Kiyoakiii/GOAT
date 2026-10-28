@@ -1,0 +1,24 @@
+{
+  "source": "Reference_Ibex_Realistic.blend, native portrait groom in forward game pose",
+  "sourceStrands": 385000,
+  "hairCards": 33284,
+  "bodyCards": 32084,
+  "earTailCards": 1200,
+  "hairsPerAtlasTile": 12,
+  "pointsPerCard": 7,
+  "beardStrands": 7000,
+  "surfaceVertices": 986776,
+  "textureResolution": 2048,
+  "hairRoughness": 0.52,
+  "radialRoughness": 0.46,
+  "randomRoughness": 0.12,
+  "hairColorVariation": [
+    0.65,
+    1.3,
+    2.5
+  ],
+  "hornScale": 0.66666666666666663,
+  "lightingExported": false,
+  "cameraExported": false,
+  "runtimeEnabled": false
+}

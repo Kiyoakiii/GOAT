@@ -12,10 +12,13 @@ namespace GoatDescent
         private readonly bool[] hoofHolding = new bool[4];
         private Rigidbody body;
         private GoatGroundDetector ground;
+        private GoatHealth health;
         private float fallTime;
         private float catchCooldown;
         private float slipUntil;
         private float lean;
+        private GoatMechanicsSettings tuning;
+        private GoatMechanicsSettings Tuning => tuning ? tuning : tuning=GoatMechanics.For(this);
 
         public float Balance01 { get; private set; } = 1f;
         public int HoovesHolding { get; private set; }
@@ -34,6 +37,7 @@ namespace GoatDescent
         {
             body = GetComponent<Rigidbody>();
             ground = GetComponent<GoatGroundDetector>();
+            health = GetComponent<GoatHealth>();
         }
 
         public void ResetBalance()
@@ -50,6 +54,7 @@ namespace GoatDescent
         private void FixedUpdate()
         {
             if (!MountainAuthority.IsHost) return;
+            if (GetComponent<GoatComedyActions>()?.Busy == true) { ResetBalance(); return; }
             if (GetComponent<GoatGripController>()?.SuperActive == true)
             {
                 Balance01 = Mathf.MoveTowards(Balance01, .8f, Time.fixedDeltaTime * 3f);
@@ -123,19 +128,30 @@ namespace GoatDescent
             bool braking = hasInput && controller.WantsBrake;
             float recklessTurn = Mathf.Abs(steering) * Mathf.InverseLerp(4f, 11f, body.linearVelocity.magnitude)
                 * (braking ? .2f : 1f) * .23f;
-            float target = Mathf.Clamp01(1f - outside * .7f - slopeCost - speedCost
-                - missingCost - recklessTurn);
-            Balance01 = Mathf.MoveTowards(Balance01, target, Time.fixedDeltaTime * 2.8f);
-            lean = Mathf.MoveTowards(lean, Mathf.Clamp(-(offset - midpoint) * 38f, -22f, 22f),
+            health ??= GetComponent<GoatHealth>();
+            float injury = health ? health.Injury01 : 0f;
+            float healthStability = Mathf.Lerp(1f, .45f, injury);
+            float stability=Mathf.Max(.1f,Tuning.stability*(GetComponent<GoatBeerEffect>()?.StabilityMultiplier??1f)*healthStability);
+            // Injuries make steep footing and rushed/partial support harder.
+            // A safe flat ledge remains a place to rest, and braking still helps.
+            float injurySlopeCost = injury * Mathf.InverseLerp(10f, 65f, ground.SlopeAngle)
+                * (braking ? .176f : .32f);
+            float rainCost = (WorldWeather.Current ? WorldWeather.Current.Wetness : 0f)
+                * Mathf.InverseLerp(8f, 72f, ground.SlopeAngle) * (braking ? .08f : .23f);
+            float target = Mathf.Clamp01(1f - (outside * .7f + slopeCost + speedCost
+                + missingCost + recklessTurn + injurySlopeCost + rainCost)/stability-(1f-Mathf.Min(1f,stability))*.3f);
+            float recovery = target > Balance01 ? healthStability : 1f;
+            Balance01 = Mathf.MoveTowards(Balance01, target, Time.fixedDeltaTime * Tuning.balanceRecoverySpeed * recovery);
+            lean = Mathf.MoveTowards(lean, Mathf.Clamp(-(offset - midpoint) * 38f, -Tuning.maxBalanceLean, Tuning.maxBalanceLean),
                 Time.fixedDeltaTime * 70f);
 
-            if (Balance01 < .28f && Time.time >= catchCooldown)
+            if (Balance01 < Tuning.balanceSlipThreshold && Time.time >= catchCooldown)
             {
                 float direction = Mathf.Sign(offset - midpoint);
-                body.AddForce(right * direction * (.28f - Balance01) * 10f, ForceMode.Acceleration);
+                body.AddForce(right * direction * (Tuning.balanceSlipThreshold - Balance01) * 10f, ForceMode.Acceleration);
             }
-            fallTime = Balance01 < .28f ? fallTime + Time.fixedDeltaTime : 0f;
-            if (fallTime > .35f && Time.time >= catchCooldown)
+            fallTime = Balance01 < Tuning.balanceSlipThreshold ? fallTime + Time.fixedDeltaTime : 0f;
+            if (fallTime > Tuning.balanceSlipDelay * Mathf.Lerp(1f, .65f, injury) && Time.time >= catchCooldown)
             {
                 Slip(right, Vector3.ProjectOnPlane(Vector3.down, normal), offset - midpoint);
             }

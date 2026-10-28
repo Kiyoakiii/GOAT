@@ -6,7 +6,13 @@
         "GoatDescent.Player",
         "GoatDescent.Route",
         "GoatDescent.Decor",
-        "GoatDescent.Level"
+        "GoatDescent.Level",
+        "GoatDescent.ProceduralWorld.Runtime",
+        "Unity.Netcode.Runtime",
+        "Unity.Collections",
+        "Unity.Services.Core",
+        "Unity.Services.Authentication",
+        "Unity.Services.Multiplayer"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

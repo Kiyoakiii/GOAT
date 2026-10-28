@@ -15,6 +15,7 @@ namespace GoatDescent.EditorTools
             Debug.Log($"SHADER_CHECK stone={stone != null} foliage={foliage != null} standard={standard != null}");
 
             string path = "Assets/GoatDescent/Vista/Scenes/ProceduralWorldMilestone.unity";
+            if (!System.IO.File.Exists(path)) throw new System.InvalidOperationException("This shader check requires the retired milestone scene. Inspect shaders in GoatPlayground or SinglePillarPlayground instead.");
             var scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
             var controller = Object.FindFirstObjectByType<MistyPillarsSceneController>();
             controller.ClearGenerated();

@@ -10,6 +10,7 @@ namespace GoatDescent.EditorTools
         public static void Clean()
         {
             string path = "Assets/GoatDescent/Vista/Scenes/ProceduralWorldMilestone.unity";
+            if (!System.IO.File.Exists(path)) throw new System.InvalidOperationException("The milestone scene is retired. No current gameplay scene will be modified by this cleanup.");
             var scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
             var controller = Object.FindFirstObjectByType<MistyPillarsSceneController>();
             if (controller) controller.ClearGenerated();

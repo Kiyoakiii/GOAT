@@ -13,6 +13,7 @@ namespace GoatDescent
     [Serializable]
     public sealed class MountainSnapshot
     {
+        public const int CurrentSchema = 18;
         public int sequence;
         public int schema;
         public string mapSignature;
@@ -22,13 +23,62 @@ namespace GoatDescent
         public LooseState[] loose;
         public BellState[] bellsState;
         public BirdState[] birds;
+        public WeatherState weather;
+        public RockfallState rockfall;
         public GoatState[] goats;
+        public ChestState chest;
+        public SupplyChestState supplies;
+        public PuddleState[] puddles;
         public PlayerMountainProgress[] players;
         public int teamProgress;
         public int scenario;
         public bool completed;
         public int falls;
         public int bells;
+    }
+
+    [Serializable]
+    public struct RockfallState
+    {
+        public bool active;
+        public byte phase;
+        public float secondsLeft;
+        public Vector3 center, outward;
+        public RockfallStoneState[] stones;
+    }
+
+    [Serializable]
+    public struct RockfallStoneState
+    {
+        public bool active;
+        public Vector3 position;
+        public Quaternion rotation;
+        public float radius;
+    }
+
+    [Serializable]
+    public struct RockfallShelterState
+    {
+        public float protection;
+        public bool wall, still, bracing;
+    }
+
+    [Serializable]
+    public struct WeatherState
+    {
+        public bool active;
+        public byte preset;
+        public float rain, wetness, wind, clock;
+        public Vector3 direction;
+    }
+
+    [Serializable]
+    public struct PuddleState
+    {
+        public Vector3 position;
+        public Quaternion rotation;
+        public Vector3 scale;
+        public bool purple;
     }
 
     [Serializable]
@@ -93,6 +143,14 @@ namespace GoatDescent
     [Serializable]
     public struct GoatState
     {
+        public RockfallShelterState rockfallShelter;
+        public GoatHerdState herd;
+        public GoatCoatState coat;
+        public float drinkingRemaining;
+        public float health;
+        public float beerRemaining;
+        public GoatToiletState toilet;
+        public int skinNumber;
         public string id;
         public Vector3 position;
         public Quaternion rotation;
@@ -104,7 +162,41 @@ namespace GoatDescent
         public string animation;
         public Vector3 facing;
         public bool predatorCarried;
+        public float punchBuffRemaining;
+        public DescentInventoryState inventory;
+        public float anchorLength;
+        public float birdSafeRemaining, anchorRemaining, madnessRemaining;
+        public Vector3 anchorPosition, madnessDirection;
+        public bool playingDead, gettingUp;
+        public string ridingOn;
+        public float rideLean;
         public GoatPartState[] parts;
+    }
+
+    [Serializable]
+    public struct ChestState
+    {
+        public bool exists;
+        public Vector3 position;
+        public Quaternion rotation;
+        public float cooldown;
+    }
+
+    [Serializable]
+    public struct SupplyChestState
+    {
+        public bool exists;
+        public Vector3 position;
+        public Quaternion rotation;
+        public int rope, axe, parachute;
+        public float openRemaining;
+    }
+    [Serializable]
+    public struct DescentInventoryState
+    {
+        public int rope, axe, parachute, selected;
+        public bool browsing;
+        public float chuteRemaining, axeRemaining;
     }
 
     [Serializable]

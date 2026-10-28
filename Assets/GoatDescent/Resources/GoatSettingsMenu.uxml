@@ -1,0 +1,71 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+  <ui:Style src="GoatSettingsMenu.uss" />
+  <ui:VisualElement name="settingsOverlay" class="settings-overlay settings-hidden">
+    <ui:VisualElement name="mainPanel" class="settings-panel menu-home">
+      <ui:VisualElement class="settings-header">
+        <ui:Button name="back" text="← Назад" class="menu-back settings-hidden" />
+        <ui:Label name="pageTitle" text="МЕНЮ" class="settings-title" />
+        <ui:Label text="ESC" class="settings-escape" />
+      </ui:VisualElement>
+      <ui:VisualElement name="homePage" class="menu-home-page">
+        <ui:Button name="resume" text="Продолжить" class="settings-button settings-primary" />
+        <ui:Button name="openSettings" text="Настройки" class="settings-button" />
+        <ui:Button name="openControls" text="Управление" class="settings-button" />
+        <ui:Button name="openNetwork" text="Игра по сети" class="settings-button" />
+        <ui:Button name="openSkins" text="Выбрать козла" class="settings-button" />
+      </ui:VisualElement>
+      <ui:VisualElement name="settingsPage" class="settings-content settings-hidden">
+        <ui:VisualElement class="settings-sidebar">
+          <ui:Label text="КАМЕРА" class="settings-kicker" />
+          <ui:Label name="viewMode" class="settings-view" />
+          <ui:Label text="Переключай вид в любой момент клавишей F5 или этой кнопкой." class="settings-note" />
+          <ui:Button name="changeView" class="settings-button" />
+          <ui:Label text="Посмотри вниз: под тобой настоящее тело и лапы козла. Корпус следует повороту, взгляд вверх и вниз остаётся свободным." class="settings-note" />
+        </ui:VisualElement>
+        <ui:VisualElement class="settings-controls">
+          <ui:Label text="ГРАФИКА И ИЗОБРАЖЕНИЕ" class="settings-kicker" />
+          <ui:VisualElement name="graphicsPage" class="settings-page">
+            <ui:ScrollView name="graphics" mode="Vertical" class="settings-scroll" horizontal-scroller-visibility="Hidden" />
+            <ui:VisualElement class="graphics-footer">
+              <ui:Label text="Применяется сразу · сохраняется на этом ПК" class="graphics-note graphics-save-note" />
+              <ui:Button name="resetGraphics" text="Сбросить графику" class="settings-button graphics-reset" />
+            </ui:VisualElement>
+          </ui:VisualElement>
+        </ui:VisualElement>
+      </ui:VisualElement>
+      <ui:VisualElement name="controlsPage" class="settings-page settings-hidden">
+        <ui:ScrollView name="controls" mode="Vertical" class="settings-scroll" horizontal-scroller-visibility="Hidden" />
+      </ui:VisualElement>
+      <ui:VisualElement name="networkPage" class="settings-page settings-hidden">
+        <ui:ScrollView mode="Vertical" class="settings-scroll" horizontal-scroller-visibility="Hidden">
+          <ui:Label text="Создай комнату и отправь код другу. Он сможет подключиться из другой домашней сети." class="settings-note" />
+          <ui:VisualElement class="network-status">
+            <ui:Label text="СОЕДИНЕНИЕ" class="settings-kicker" />
+            <ui:Label name="networkStatus" text="Локальная игра" class="network-status-text" />
+          </ui:VisualElement>
+          <ui:VisualElement name="roomInvite" class="network-status settings-hidden">
+            <ui:Label text="КОД КОМНАТЫ · 2 ИГРОКА" class="settings-kicker" />
+            <ui:Label name="roomCode" class="network-code" />
+            <ui:Button name="copyRoomCode" text="Скопировать код" class="settings-button network-action" />
+          </ui:VisualElement>
+          <ui:VisualElement class="network-cards">
+            <ui:VisualElement class="network-card network-host-card">
+              <ui:Label text="Создать комнату" class="network-card-title" />
+              <ui:Label text="Игру лучше создавать на более мощном ПК со стабильным интернетом. Ведущий рассчитывает физику и события для обоих игроков." class="settings-note" />
+              <ui:Button name="createGame" text="Создать комнату" class="settings-button settings-primary network-action" />
+            </ui:VisualElement>
+            <ui:VisualElement class="network-card">
+              <ui:Label text="Присоединиться" class="network-card-title" />
+              <ui:TextField name="networkAddress" label="Код комнаты · 6 букв или цифр" class="network-address" />
+              <ui:Label text="Друг создаёт комнату за козла A. Ты входишь по его коду и играешь за козла B." class="settings-note" />
+              <ui:Button name="joinGame" text="Подключиться" class="settings-button network-action" />
+            </ui:VisualElement>
+          </ui:VisualElement>
+          <ui:Button name="leaveGame" text="Отменить / вернуться в локальную игру" class="settings-button settings-hidden" />
+          <ui:Label text="Ведущий — создатель комнаты. Его ПК считает физику; служба связи только передаёт данные. IP-адрес и открытие портов на роутере не нужны." class="settings-note" />
+          <ui:Label text="В сетевой игре меню не останавливает мир." class="settings-note" />
+        </ui:ScrollView>
+      </ui:VisualElement>
+    </ui:VisualElement>
+  </ui:VisualElement>
+</ui:UXML>

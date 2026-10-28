@@ -9,6 +9,7 @@ namespace GoatDescent.EditorTools
         public static void OpenMilestone()
         {
             string path = "Assets/GoatDescent/Vista/Scenes/ProceduralWorldMilestone.unity";
+            if (!System.IO.File.Exists(path)) throw new System.InvalidOperationException("The milestone scene is retired. Open Assets/GoatDescent/Scenes/GoatPlayground.unity instead.");
             var scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
             int rootCount = scene.rootCount;
             int objectCount = scene.rootCount > 0 ? scene.GetRootGameObjects()[0].transform.childCount : 0;

@@ -8,6 +8,7 @@ namespace GoatDescent
     /// Lightweight, replaceable hero-goat model. The stylized meshes are combined
     /// by material so this runtime prototype stays to a small number of draw calls.
     /// </summary>
+    [RequireComponent(typeof(GoatEmotionController))]
     public sealed class GoatVisualController : MonoBehaviour
     {
         private const string VisualName = "VisualRoot — replaceable goat model";
@@ -30,13 +31,16 @@ namespace GoatDescent
         private float manualActionUntil;
         private string activeAutomaticClip = "Goat_Idle";
         private bool surpriseEarMaskReady;
-        private GUIStyle animationHelpStyle;
         private Vector3 interactionFacing;
         private string networkClip;
         private Vector3 networkFacing;
         private float faceUntil;
+        private float locomotionSpeed;
+        private float walkCycleTime;
+        public float LocomotionSpeed => locomotionSpeed;
+        public float WalkCycleTime => walkCycleTime;
         public Vector3 Facing => visual ? visual.forward : transform.forward;
-        public string CurrentClip => manualActionClip ?? activeAutomaticClip;
+        public string CurrentClip => string.IsNullOrEmpty(manualActionClip) ? activeAutomaticClip : manualActionClip;
         public void SetJumpPreparation(bool value)
         {
             var motor = GetComponent<GoatController>();
@@ -54,6 +58,7 @@ namespace GoatDescent
         public void PlayLanding(float impact)
         {
             if (impact >= 7f) PlaySurpriseEarOverlay();
+            if (impact >= 5f) GetComponent<GoatEmotionController>()?.ReactToImpact(impact / 12f);
         }
         public void ApplyNetworkPose(string clip, Vector3 facing)
         {
@@ -73,10 +78,20 @@ namespace GoatDescent
             if (!importedAnimation || importedAnimation[clip] == null) return;
             importedAnimation.Stop("Goat_Surprise");
             var state = importedAnimation[clip];
-            state.time = 0f; state.speed = 1f; state.wrapMode = WrapMode.Once;
+            state.time = 0f; state.speed = 1f; state.wrapMode = clip == "Goat_PanicRun" || clip == "Goat_PlayDeadHold" || clip == "Goat_BackRide" ? WrapMode.Loop : WrapMode.Once;
             manualActionClip = clip; manualActionUntil = Time.time + duration;
             activeAutomaticClip = clip;
             importedAnimation.CrossFade(clip, .09f, PlayMode.StopSameLayer);
+        }
+        public void EndComedyPose()
+        {
+            string clip = CurrentClip;
+            if (clip != "Goat_PlayDeadStart" && clip != "Goat_PlayDeadHold"
+                && clip != "Goat_GetUp" && clip != "Goat_BackRide") return;
+            manualActionClip = null; manualActionUntil = 0;
+            activeAutomaticClip = ground && ground.IsGrounded ? "Goat_Idle" : "Goat_Jump";
+            if (importedAnimation && importedAnimation[activeAutomaticClip] != null)
+                importedAnimation.CrossFade(activeAutomaticClip, .12f, PlayMode.StopSameLayer);
         }
 
         public void Configure(Rigidbody targetBody, GoatGroundDetector targetGround)
@@ -115,6 +130,9 @@ namespace GoatDescent
 
             if (importedAnimation != null)
             {
+                // Replacement skins hide the renderers cached by the imported
+                // Animation component. Physics still needs an advancing pose.
+                importedAnimation.cullingType = AnimationCullingType.AlwaysAnimate;
                 foreach (AnimationState state in importedAnimation)
                     state.wrapMode = IsLoop(state.name) ? WrapMode.Loop : state.name == "Goat_Jump" ? WrapMode.ClampForever : WrapMode.Once;
                 ConfigureSurpriseEarMask();
@@ -123,7 +141,7 @@ namespace GoatDescent
             }
             if (interactionFacing.sqrMagnitude > .01f) SetFacing(interactionFacing);
         }
-        private static bool IsLoop(string clip) => clip == "Goat_Idle" || clip == "Goat_Walk"
+        private static bool IsLoop(string clip) => clip == "Goat_Idle" || clip == "Goat_Walk" || clip == "Goat_PanicRun" || clip == "Goat_PlayDeadHold" || clip == "Goat_BackRide"
             || clip == "Goat_GrabHold" || clip == "Goat_GrabbedHold" || clip == "Goat_Pull"
             || clip == "Goat_Hang"
             || clip == "Goat_RescueBrace" || clip == "Goat_GripStrain"
@@ -303,6 +321,8 @@ namespace GoatDescent
             if (importedAnimation != null && !surpriseEarMaskReady)
                 ConfigureSurpriseEarMask();
 
+            UpdateWalkCycle();
+
             if (!MountainAuthority.IsHost)
             {
                 if (importedAnimation && !string.IsNullOrEmpty(networkClip)
@@ -325,7 +345,7 @@ namespace GoatDescent
                     manualActionClip = null;
 
                 var goat = GetComponent<GoatController>();
-                if (goat && (goat.IsPredatorCarried || (ground && !ground.IsGrounded && body.linearVelocity.y < -3f)))
+                if (GetComponent<GoatComedyActions>()?.Busy != true && goat && (goat.IsPredatorCarried || (ground && !ground.IsGrounded && body.linearVelocity.y < -3f)))
                     manualActionClip = null;
 
                 if (string.IsNullOrEmpty(manualActionClip))
@@ -335,7 +355,8 @@ namespace GoatDescent
                     string clip = goat && goat.IsPredatorCarried ? "Goat_Idle"
                         : ground && !ground.IsGrounded
                             ? "Goat_Jump"
-                            : velocity.sqrMagnitude > .2f ? "Goat_Walk" : "Goat_Idle";
+                            : velocity.sqrMagnitude > (activeAutomaticClip == "Goat_Walk" ? .06f : .16f)
+                                ? "Goat_Walk" : "Goat_Idle";
                     var pair = GetComponent<GoatInteraction>();
                     if (pair && pair.IsLinked && !(goat && goat.IsPredatorCarried))
                     {
@@ -348,8 +369,12 @@ namespace GoatDescent
                         else
                             clip = ground && ground.IsGrounded ? "Goat_GrabbedHold" : "Goat_GripStrain";
                     }
+                    string comedyClip = GetComponent<GoatComedyActions>()?.PoseClip;
+                    if (comedyClip != null) clip = comedyClip;
                     if (importedAnimation[clip] == null) clip = "Goat_Idle";
-                    if (!importedAnimation.IsPlaying(clip))
+                    // A fading state can still be "playing" at zero weight.
+                    // Keep the physical body's selected pose in sync with the requested state.
+                    if (activeAutomaticClip != clip || !importedAnimation.IsPlaying(clip))
                     {
                         importedAnimation[clip].wrapMode = IsLoop(clip) ? WrapMode.Loop : WrapMode.Once;
                         importedAnimation.CrossFade(clip, .15f);
@@ -370,9 +395,25 @@ namespace GoatDescent
 
             Vector3 horizontal = body.linearVelocity;
             horizontal.y = 0f;
+            var viewMotor = GetComponent<GoatController>();
+            bool viewLocomotion = viewMotor && !viewMotor.IsPredatorCarried
+                && GetComponent<GoatInteraction>()?.IsBusy != true
+                && GetComponent<GoatComedyActions>()?.Busy != true
+                && GetComponent<GoatDescentTricks>()?.Busy != true
+                && GetComponent<GoatPunchBuff>()?.PerformingPair != true
+                && GetComponent<GoatToiletAction>()?.Active != true
+                && string.IsNullOrEmpty(manualActionClip);
             if (Time.time < faceUntil && interactionFacing.sqrMagnitude > .01f)
             {
                 visual.rotation = Quaternion.Slerp(visual.rotation, Quaternion.LookRotation(interactionFacing, Vector3.up), 1f - Mathf.Exp(-16f * Time.deltaTime));
+            }
+            else if (viewLocomotion)
+            {
+                Vector3 up = ground && ground.IsGrounded ? ground.GroundNormal : Vector3.up;
+                // Keep the skinned mesh aligned with the physical pelvis in
+                // both camera modes; the articulated bones lead the turn.
+                visual.rotation = Quaternion.Slerp(visual.rotation, Quaternion.LookRotation(transform.forward, up),
+                    1f - Mathf.Exp(-18f * Time.deltaTime));
             }
             else if (horizontal.sqrMagnitude > 0.2f)
             {
@@ -384,9 +425,35 @@ namespace GoatDescent
             visual.localScale = Vector3.one;
         }
 
+        private void UpdateWalkCycle()
+        {
+            var motor = GetComponent<GoatController>();
+            Vector3 velocity = motor ? motor.Velocity : body.linearVelocity;
+            float speed = Vector3.ProjectOnPlane(velocity,
+                ground && ground.IsGrounded ? ground.GroundNormal : Vector3.up).magnitude;
+            locomotionSpeed = Mathf.Lerp(locomotionSpeed, speed, 1f - Mathf.Exp(-14f * Time.deltaTime));
+            AnimationState walk = importedAnimation ? importedAnimation["Goat_Walk"] : null;
+            if (walk == null) return;
+            // Longer strides at speed, rather than replaying the same slow walk
+            // while the root races ahead. Keep phase through brief stops and fades.
+            float stride = Mathf.Lerp(1.15f, 2.35f, Mathf.InverseLerp(.5f, 5.35f, locomotionSpeed));
+            float cyclesPerSecond = Mathf.Min(2.6f, speed / stride);
+            // Follow actual motion, not the pressed key: when W/S changes, the
+            // hooves first finish braking and then step in the new direction.
+            // Velocity also works for remotely rendered goats without local input.
+            if (Vector3.Dot(velocity, transform.forward) < -.1f)
+                cyclesPerSecond = -cyclesPerSecond;
+            if (CurrentClip == "Goat_Walk" && ground && ground.IsGrounded)
+                walkCycleTime = Mathf.Repeat(walkCycleTime + cyclesPerSecond * Time.deltaTime, 1f);
+            walk.speed = cyclesPerSecond * walk.length;
+            walk.time = walkCycleTime * walk.length;
+        }
+
         public void PlayNetworkAction(byte action)
         {
             if (!MountainAuthority.IsHost || action == 0) return;
+            if (GetComponent<GoatDescentTricks>()?.Busy == true || GetComponent<GoatComedyActions>()?.Busy == true
+                || GetComponent<GoatPunchBuff>()?.PerformingPair == true) return;
             switch (action)
             {
                 case 1: PlayManualAction("Goat_EatGrass"); break;
@@ -401,8 +468,10 @@ namespace GoatDescent
 
         private void ReadAnimationHotkeys()
         {
+            if (GetComponent<GoatDescentTricks>()?.Busy == true || GetComponent<GoatComedyActions>()?.Busy == true
+                || GetComponent<GoatPunchBuff>()?.PerformingPair == true) return;
             if (Input.GetKeyDown(KeyCode.Q)) PlayManualAction("Goat_EatGrass");
-            else if (Input.GetKeyDown(KeyCode.E)) PlayManualAction("Goat_Pee");
+            else if (Input.GetKeyDown(KeyCode.P)) PlayManualAction("Goat_Pee");
             else if (Input.GetKeyDown(KeyCode.C)) PlayManualAction("Goat_Poop");
             else if (Input.GetKeyDown(KeyCode.V)) PlayManualAction("Goat_Sequence");
             else if (Input.GetKeyDown(KeyCode.Z)) PlayManualAction("GoatA_Duo_Performance");
@@ -415,6 +484,12 @@ namespace GoatDescent
 
         private void PlayManualAction(string clipName)
         {
+            if(clipName=="Goat_Pee" || clipName=="Goat_Poop")
+            {
+                GetComponent<GoatToiletAction>()?.TryStart(clipName=="Goat_Pee" ? GoatToiletKind.Pee : GoatToiletKind.Poop);
+                return;
+            }
+            if(GetComponent<GoatToiletAction>()?.Active==true) return;
             AnimationState state = importedAnimation[clipName];
             if (state == null)
             {
@@ -436,6 +511,22 @@ namespace GoatDescent
             activeAutomaticClip = clipName;
             importedAnimation.CrossFade(clipName, 0.2f, PlayMode.StopSameLayer);
             ApplySurpriseEarsForAction(clipName);
+        }
+        public void EndDrinkingPose()
+        {
+            if (CurrentClip != "Goat_EatGrass") return;
+            manualActionClip = null; manualActionUntil = 0; faceUntil = 0;
+            activeAutomaticClip = ground && ground.IsGrounded ? "Goat_Idle" : "Goat_Jump";
+            if (importedAnimation && importedAnimation[activeAutomaticClip] != null)
+                importedAnimation.CrossFade(activeAutomaticClip, .16f, PlayMode.StopSameLayer);
+        }
+        public void EndToiletPose()
+        {
+            if(CurrentClip!="Goat_Pee" && CurrentClip!="Goat_Poop") return;
+            manualActionClip=null;manualActionUntil=0;faceUntil=0;
+            activeAutomaticClip=ground && ground.IsGrounded ? "Goat_Idle" : "Goat_Jump";
+            if(importedAnimation && importedAnimation[activeAutomaticClip]!=null)
+                importedAnimation.CrossFade(activeAutomaticClip,.16f,PlayMode.StopSameLayer);
         }
 
         private void ApplySurpriseEarsForAction(string clipName)
@@ -499,19 +590,5 @@ namespace GoatDescent
             return null;
         }
 
-        private void OnGUI()
-        {
-            if (importedAnimation == null || !GoatLocalControl.AllowsInput(this))
-                return;
-
-            animationHelpStyle ??= new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 15,
-                normal = { textColor = new Color(1f, 1f, 1f, 0.94f) }
-            };
-            GUI.Label(new Rect(25, 108, 960, 24),
-                "Анимации: Q — трава   E — пописать   C — покакать   T — удивление   V — весь ролик   Z/X — роли дуэта",
-                animationHelpStyle);
-        }
     }
 }

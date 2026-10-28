@@ -98,6 +98,7 @@ namespace GoatDescent.ProceduralWorld.Editor
 
         public static void GenerateWorld(WorldSettings settings)
         {
+            VistaAssetPaths.RequireSavedWorld();
             GenerateWorld(settings, VistaAssetPaths.ScenePath, true);
         }
 

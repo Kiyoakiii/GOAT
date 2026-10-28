@@ -82,6 +82,10 @@ namespace GoatDescent.Editor
                 AssetDatabase.SaveAssets();
                 if (AssetDatabase.LoadAssetAtPath<GameObject>("Assets/GoatDescent/Art/RefinedGoat/Goat_PairGameplay.fbx")) PairAnimationImporter.Build();
                 if (AssetDatabase.LoadAssetAtPath<GameObject>("Assets/GoatDescent/Art/RefinedGoat/Goat_PhysicsActions.fbx")) PairAnimationImporter.ImportPhysics();
+                if (AssetDatabase.LoadAssetAtPath<GameObject>("Assets/GoatDescent/Art/RefinedGoat/Goat_RightPunch.fbx")) PairAnimationImporter.ImportRightPunch();
+                if (AssetDatabase.LoadAssetAtPath<GameObject>("Assets/GoatDescent/Art/RefinedGoat/Goat_DescentTricks.fbx")) PairAnimationImporter.ImportDescentTricks();
+                if (AssetDatabase.LoadAssetAtPath<GameObject>("Assets/GoatDescent/Art/RefinedGoat/Goat_ComedyActions.fbx")) PairAnimationImporter.ImportComedy();
+                if (AssetDatabase.LoadAssetAtPath<GameObject>("Assets/GoatDescent/Art/RefinedGoat/Goat_ToiletActions.fbx")) PairAnimationImporter.ImportToilet();
                 Debug.Log("REFINED_GOAT_READY source=Goat_Duo_Refined.blend clips=Idle,Walk,Jump,EatGrass,Pee,Poop,Surprise,Sequence,GoatA_Duo_Performance,GoatB_Duo_Performance");
             }
             finally { Object.DestroyImmediate(root); }

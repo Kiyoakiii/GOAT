@@ -11,6 +11,11 @@ namespace GoatDescent.EditorTools
         [MenuItem("Tools/Procedural World/Rebuild Misty Scene")]
         public static void RebuildScene()
         {
+            if (!AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath))
+            {
+                Debug.LogWarning("The retired milestone scene is removed. Open GoatPlayground for green pillars gameplay.");
+                return;
+            }
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             var lightObject = new GameObject("Directional Light");
