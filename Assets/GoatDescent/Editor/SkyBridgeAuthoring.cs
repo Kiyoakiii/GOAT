@@ -342,7 +342,11 @@ namespace GoatDescent.EditorTools
             item.AddComponent<MeshFilter>().sharedMesh = mesh;
             item.AddComponent<MeshRenderer>().sharedMaterial = material;
             item.isStatic = true;
-            if (collider) item.AddComponent<MeshCollider>().sharedMesh = mesh;
+            if (collider)
+            {
+                item.AddComponent<MeshCollider>().sharedMesh = mesh;
+                item.AddComponent<GoatDescent.MountainSlopeSurface>();
+            }
             return item.transform;
         }
 
@@ -817,6 +821,44 @@ namespace GoatDescent.EditorTools
         {
             public int Surface;
             public List<Vector3> Keys;
+        }
+
+        public static Vector3[] PlayRoute()
+        {
+            var path = PlayResample(TrailPoints(), 4f / WorldScale);
+            var result = new Vector3[path.Count];
+            for (int i = 0; i < path.Count; i++) result[i] = path[i] * WorldScale;
+            return result;
+        }
+
+        private static List<Vector3> PlayResample(List<Vector3> source, float step)
+        {
+            var result = new List<Vector3> { source[0] };
+            float carry = 0f;
+            for (int i = 0; i < source.Count - 1; i++)
+            {
+                float length = FlatDistance(source[i], source[i + 1]);
+                if (length < .0001f) continue;
+                int stage = routeStages[i];
+                float travelled = 0f;
+                while (true)
+                {
+                    float need = step - carry;
+                    if (travelled + need > length) { carry += length - travelled; break; }
+                    travelled += need;
+                    Vector3 point = Vector3.Lerp(source[i], source[i + 1], travelled / length);
+                    point.y = RouteHeight(stage, point.x, point.z);
+                    result.Add(point);
+                    carry = 0f;
+                }
+            }
+            Vector3 tail = source[source.Count - 1];
+            if (FlatDistance(result[result.Count - 1], tail) > step * .35f)
+            {
+                tail.y = RouteHeight(routeStages[routeStages.Count - 1], tail.x, tail.z);
+                result.Add(tail);
+            }
+            return result;
         }
 
         private static List<Vector3> TrailPoints()

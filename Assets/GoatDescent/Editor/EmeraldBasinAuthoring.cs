@@ -142,6 +142,51 @@ namespace GoatDescent.EditorTools
             Debug.Log("ROUTE_SHOTS EmeraldBasin waypoints=" + points.Count);
         }
 
+        public static Vector3[] PlayRoute()
+        {
+            random = new System.Random(48271);
+            AdvanceToTrailSeed();
+            PlanTrail();
+            var path = ResamplePath(route, 4f / WorldScale);
+            var result = new Vector3[path.Count];
+            for (int i = 0; i < path.Count; i++)
+            {
+                Vector3 local = path[i];
+                local.y = TrailSurface(local);
+                result[i] = local * WorldScale;
+            }
+            return result;
+        }
+
+        private static void AdvanceToTrailSeed()
+        {
+            for (int fall = 0; fall < EmeraldBasinMesh.FallAngles.Length; fall++)
+                for (int tier = EmeraldBasinMesh.FallBottoms[fall]; tier <= EmeraldBasinMesh.FallTops[fall]; tier++)
+                    random.NextDouble();
+        }
+
+        private static List<Vector3> ResamplePath(IList<Vector3> source, float step)
+        {
+            var result = new List<Vector3> { source[0] };
+            float carry = 0f;
+            for (int i = 1; i < source.Count; i++)
+            {
+                float segment = Flat(source[i - 1], source[i]);
+                if (segment < .0001f) continue;
+                float travelled = 0f;
+                while (carry + segment - travelled >= step)
+                {
+                    travelled += step - carry;
+                    result.Add(Vector3.Lerp(source[i - 1], source[i], travelled / segment));
+                    carry = 0f;
+                }
+                carry += segment - travelled;
+            }
+            if (Flat(result[result.Count - 1], source[source.Count - 1]) > step * .35f)
+                result.Add(source[source.Count - 1]);
+            return result;
+        }
+
         private static Vector3 ClearCameraEye(Vector3 eye, Vector3 look)
         {
             float raised = 0f;
@@ -1456,7 +1501,11 @@ namespace GoatDescent.EditorTools
             var item = new GameObject(name); item.transform.SetParent(parent, false); item.transform.localPosition = position;
             item.transform.localScale = scale; item.AddComponent<MeshFilter>().sharedMesh = mesh;
             item.AddComponent<MeshRenderer>().sharedMaterial = material; item.isStatic = true;
-            if (collider) item.AddComponent<MeshCollider>().sharedMesh = mesh;
+            if (collider)
+            {
+                item.AddComponent<MeshCollider>().sharedMesh = mesh;
+                item.AddComponent<GoatDescent.MountainSlopeSurface>();
+            }
             return item.transform;
         }
 

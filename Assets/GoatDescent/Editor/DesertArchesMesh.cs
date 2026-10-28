@@ -729,10 +729,10 @@ namespace GoatDescent.EditorTools
                     + (Mathf.PerlinNoise(at * .011f + seed * .31f, seed * .73f) - .5f) * .26f;
                 float crackPhase = at * .31f + seed * 2.3f;
                 float finePhase = at * .63f + seed * 1.1f;
-                float coarseWidth = Mathf.Lerp(3.8f, 1.7f,
-                    Mathf.InverseLerp(.5f, 1.7f, .5f + 1.2f * Mathf.PerlinNoise(at * .023f + seed * .61f, seed * .17f)));
-                float fineWidth = Mathf.Lerp(4.8f, 2.2f,
-                    Mathf.InverseLerp(.5f, 1.7f, .5f + 1.2f * Mathf.PerlinNoise(at * .049f + seed * 1.31f, seed * .43f)));
+                float coarseWidth = Mathf.Max(.6f, Mathf.Lerp(3.8f, 1.7f,
+                    Mathf.InverseLerp(.5f, 1.7f, .5f + 1.2f * Mathf.PerlinNoise(at * .023f + seed * .61f, seed * .17f))));
+                float fineWidth = Mathf.Max(.6f, Mathf.Lerp(4.8f, 2.2f,
+                    Mathf.InverseLerp(.5f, 1.7f, .5f + 1.2f * Mathf.PerlinNoise(at * .049f + seed * 1.31f, seed * .43f))));
                 for (int ring = 0; ring < bands.Count; ring++)
                 {
                     float t = bands[ring];

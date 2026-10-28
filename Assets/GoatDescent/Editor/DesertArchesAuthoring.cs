@@ -15,6 +15,48 @@ namespace GoatDescent.EditorTools
         private const int TerrainGrid = 360;
         private const int PlinthLevels = 8;
         private const float WorldScale = 5f;
+        private const float RouteStep = 6f;
+        private const float RouteSlopeLimit = .6f;
+        private const float RouteRiseLimit = 2.1f;
+        private const float RouteProbeRiseLimit = 1.1f;
+        private const float RouteSegmentRiseLimit = 3.3f;
+        private const float RouteProbeDropLimit = 1.6f;
+        private const float RouteSegmentDropLimit = 3.3f;
+        private const int RouteProbeSteps = 16;
+        private const float RouteSidestep = 3f;
+        private const int RouteSidestepMax = 150;
+        private const int RouteDetourBudget = 6000;
+        private const float RouteZigzagSide = 4f;
+        private const float RouteZigzagForward = 4f;
+        private const int RouteZigzagSteps = 3000;
+        private const float RouteZigzagDrop = 6f;
+        private const float RouteAscentSlopeLimit = .85f;
+        private const float RouteAscentProbeSlope = .95f;
+        private const float RouteAscentProbeStep = .8f;
+        private const int RouteAscentCandidates = 8;
+        private const float RouteAscentMinClimb = 25f;
+        private const int RouteAscentRimSamples = 121;
+        private const float RouteAscentRimSpan = 900f;
+        private const float RouteClimbLimit = 1.15f;
+        private const float RouteFlatLimit = .3f;
+        private const float RouteFlatRadius = 10f;
+        private const float RouteCanyonDrift = 1.6f;
+        private const int RouteRimSamples = 61;
+        private const float RouteRimWest = 260f;
+        private const float RouteRimEast = 490f;
+        private const float RouteRimReach = 900f;
+        private const float RouteCapsuleHalfWidth = .4f;
+        private const float RouteCapsuleEdgeDrop = 3f;
+        private const float RouteCapsuleShift = .6f;
+        private const int RouteCapsuleProbeSteps = 8;
+        private const int RouteCapsuleDetourSteps = 20;
+        private const float RouteRepairRadius = 15f;
+        private static readonly Vector3[] RouteRepairSpots =
+        {
+            new Vector3(4022f, 0f, -120f),
+            new Vector3(3962f, 0f, -120f),
+            new Vector3(3911f, 0f, -553f),
+        };
         private static readonly Vector3 Viewpoint = new Vector3(-270f, 0f, 315f);
 
         private struct Deck
@@ -35,6 +77,17 @@ namespace GoatDescent.EditorTools
             public float height;
             public float shoulder;
             public List<Deck> decks;
+        }
+
+        private struct Ascent
+        {
+            public Vector3 floor;
+            public Vector3 rim;
+            public List<Vector3> ladder;
+            public bool strict;
+            public bool joined;
+            public float length;
+            public float maxSlope;
         }
 
         private static readonly List<Site> sites = new List<Site>();
@@ -227,6 +280,790 @@ namespace GoatDescent.EditorTools
             }
             Object.DestroyImmediate(cameraGo);
             Debug.Log("ROUTE_SHOTS DesertArches count=" + count);
+        }
+
+        public static Vector3[] PlayRoute()
+        {
+            System.Func<Vector3, float> ground = point => { PlayGround(point, out float height); return height; };
+            var legacy = RouteWorld();
+            Vector3 start = CanyonStart(ground);
+            Ascent ascent = FindAscent(start, PlateauLevel(legacy, ground), ground);
+            var points = new List<Vector3>(CanyonTraverse(start, ascent.floor, ground));
+            points.AddRange(ascent.ladder);
+            int join = PlateauJoin(legacy, points[points.Count - 1], ground);
+            Vector3 gate = Flat(legacy[join]);
+            ascent.joined = AscentStep(points[points.Count - 1], gate, ground);
+            if (!ascent.joined)
+            {
+                var bridge = new List<Vector3>();
+                if (RiseZigzag(points[points.Count - 1], gate, bridge, ground))
+                {
+                    LadderStats(bridge, ground, ref ascent.length, ref ascent.maxSlope);
+                    points.AddRange(bridge);
+                    ascent.joined = true;
+                }
+            }
+            for (int i = join; i < legacy.Count; i++) points.Add(Flat(legacy[i]));
+            var route = Resample(points, RouteStep);
+            route = RouteContours(route, ground);
+            route = RouteCapsule(route, ground);
+            var result = new Vector3[route.Count];
+            for (int i = 0; i < route.Count; i++)
+                result[i] = new Vector3(route[i].x, ground(route[i]), route[i].z);
+            VerifyRoute(result, start, ascent, join, ground);
+            return result;
+
+            void PlayGround(Vector3 worldXZ, out float y)
+            {
+                float analytic = RouteGround(worldXZ);
+                if (Physics.Raycast(worldXZ + Vector3.up * (analytic + 4f), Vector3.down, out RaycastHit low, 300f, ~0, QueryTriggerInteraction.Ignore)
+                    && low.point.y <= analytic + 8f)
+                {
+                    y = low.point.y;
+                    return;
+                }
+                if (Physics.Raycast(worldXZ + Vector3.up * 300f, Vector3.down, out RaycastHit high, 6000f, ~0, QueryTriggerInteraction.Ignore)
+                    && high.point.y <= analytic + 8f)
+                {
+                    y = high.point.y;
+                    return;
+                }
+                y = analytic;
+            }
+        }
+
+        private static float PlateauLevel(IList<Vector3> legacy, System.Func<Vector3, float> ground)
+        {
+            float threshold = (DesertArchesMesh.FloorY + 70f) * WorldScale;
+            float sum = 0f;
+            int count = 0;
+            for (int i = 0; i < legacy.Count; i++)
+            {
+                float height = ground(legacy[i]);
+                if (height < threshold) continue;
+                sum += height;
+                count++;
+            }
+            return count > 0 ? sum / count : threshold;
+        }
+
+        private static Vector3 CanyonStart(System.Func<Vector3, float> ground)
+        {
+            float arch = sites[0].summit.x;
+            float floorLimit = (DesertArchesMesh.FloorY - DesertArchesMesh.GorgeDepth + 18f) * WorldScale;
+            float best = float.PositiveInfinity;
+            Vector3 chosen = ChannelFloor(arch);
+            for (float x = arch - 170f; x <= arch + 40f; x += 5f)
+            {
+                Vector3 point = ChannelFloor(x);
+                if (ground(point) > floorLimit) continue;
+                float gradient = GroundGradient(point, RouteFlatRadius, ground);
+                if (gradient > RouteFlatLimit) continue;
+                float score = Mathf.Abs(x - (arch - 95f)) + gradient * 300f;
+                if (score >= best) continue;
+                best = score;
+                chosen = point;
+            }
+            return chosen;
+        }
+
+        private static Vector3 ChannelFloor(float x, float drift = 0f)
+        {
+            float z = DesertArchesMesh.ChannelZ(x) + drift;
+            return new Vector3(x * WorldScale, 0f, z * WorldScale);
+        }
+
+        private static float GroundGradient(Vector3 point, float radius, System.Func<Vector3, float> ground)
+        {
+            float centre = ground(point);
+            float worst = 0f;
+            for (int probe = 0; probe < 8; probe++)
+            {
+                float angle = probe * Mathf.PI / 4f;
+                Vector3 sample = point + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius;
+                worst = Mathf.Max(worst, Mathf.Abs(ground(sample) - centre) / radius);
+            }
+            return worst;
+        }
+
+        private static List<Vector3> CanyonTraverse(Vector3 start, Vector3 end, System.Func<Vector3, float> ground)
+        {
+            var path = new List<Vector3> { Flat(start) };
+            float fromX = start.x / WorldScale;
+            float toX = end.x / WorldScale;
+            int steps = Mathf.CeilToInt(Mathf.Abs(toX - fromX) * WorldScale / RouteStep);
+            for (int step = 1; step <= steps; step++)
+            {
+                float x = Mathf.Lerp(fromX, toX, step / (float)steps);
+                Vector3 previous = path[path.Count - 1];
+                Vector3 next = ChannelFloor(x);
+                if (!RouteSteep(previous, next, ground))
+                {
+                    path.Add(next);
+                    continue;
+                }
+                bool moved = false;
+                for (int reach = 1; reach <= 5 && !moved; reach++)
+                    for (int side = -1; side <= 1 && !moved; side += 2)
+                    {
+                        Vector3 candidate = ChannelFloor(x, side * reach * RouteCanyonDrift);
+                        if (RouteSteep(previous, candidate, ground)) continue;
+                        path.Add(candidate);
+                        moved = true;
+                    }
+                if (!moved) path.Add(next);
+            }
+            path.Add(Flat(end));
+            return path;
+        }
+
+        private static Ascent FindAscent(Vector3 start, float level, System.Func<Vector3, float> ground)
+        {
+            float centre = start.x / WorldScale;
+            var best = new Ascent { ladder = null };
+            var closest = new Ascent { ladder = null };
+            float bestScore = float.PositiveInfinity;
+            float bestGain = 0f;
+            TryAscent(AscentSaddles(centre, level, ground, -1, RouteRimSamples, RouteRimWest, RouteRimEast), ground,
+                ref best, ref closest, ref bestScore, ref bestGain);
+            if (best.ladder == null)
+                TryAscent(AscentSaddles(centre, level, ground, 0, RouteAscentRimSamples, RouteAscentRimSpan, RouteAscentRimSpan), ground,
+                    ref best, ref closest, ref bestScore, ref bestGain);
+            if (best.ladder != null) return best;
+            if (closest.ladder != null) return closest;
+            Vector3 fallback = ChannelFloor(centre);
+            return new Ascent { floor = fallback, rim = fallback, ladder = new List<Vector3> { fallback }, strict = false };
+        }
+
+        private static List<Ascent> AscentSaddles(float centre, float level, System.Func<Vector3, float> ground, int side, int samples, float west, float east)
+        {
+            var saddles = new List<Ascent>();
+            int from = side == 0 ? 1 : side;
+            int to = side == 0 ? -1 : side;
+            for (int s = from; s >= to; s -= 2)
+            {
+                for (int sample = 0; sample < samples; sample++)
+                {
+                    float x = centre - west + (west + east) * sample / (samples - 1f);
+                    Vector3 floor = ChannelFloor(x);
+                    Vector3 rim;
+                    if (!RimTarget(floor, ChannelOutward(floor, s), level, ground, out rim)) continue;
+                    float floorHeight = ground(floor);
+                    if (floorHeight >= level - 5f) continue;
+                    float climb = ground(rim) - floorHeight;
+                    if (climb < RouteAscentMinClimb) continue;
+                    float span = Vector2.Distance(new Vector2(floor.x, floor.z), new Vector2(rim.x, rim.z));
+                    saddles.Add(new Ascent { floor = floor, rim = rim, ladder = null, maxSlope = climb / Mathf.Max(1f, span) });
+                }
+            }
+            saddles.Sort((a, b) => a.maxSlope.CompareTo(b.maxSlope));
+            return saddles;
+        }
+
+        private static void TryAscent(List<Ascent> saddles, System.Func<Vector3, float> ground,
+            ref Ascent best, ref Ascent closest, ref float bestScore, ref float bestGain)
+        {
+            int tries = 0;
+            for (int i = 0; i < saddles.Count && tries < RouteAscentCandidates; i++, tries++)
+            {
+                Ascent saddle = saddles[i];
+                int cap = best.ladder != null ? Mathf.Min(RouteZigzagSteps, best.ladder.Count) : RouteZigzagSteps;
+                var ladder = new List<Vector3>();
+                bool reached = RiseZigzag(saddle.floor, saddle.rim, ladder, ground, cap);
+                float gain = ladder.Count > 0 ? ground(ladder[ladder.Count - 1]) - ground(saddle.floor) : 0f;
+                if (!reached)
+                {
+                    if (gain <= bestGain || ladder.Count >= cap) continue;
+                    bestGain = gain;
+                    closest = saddle;
+                    closest.ladder = ladder;
+                    closest.strict = false;
+                    continue;
+                }
+                if (ladder.Count >= bestScore) continue;
+                bestScore = ladder.Count;
+                best = saddle;
+                best.ladder = ladder;
+                best.strict = true;
+                best.length = 0f;
+                best.maxSlope = 0f;
+                LadderStats(ladder, ground, ref best.length, ref best.maxSlope);
+            }
+        }
+
+        private static void LadderStats(IList<Vector3> path, System.Func<Vector3, float> ground, ref float length, ref float maxSlope)
+        {
+            if (path.Count < 2) return;
+            float previous = ground(path[0]);
+            for (int i = 1; i < path.Count; i++)
+            {
+                float run = new Vector2(path[i].x - path[i - 1].x, path[i].z - path[i - 1].z).magnitude;
+                float height = ground(path[i]);
+                float rise = height - previous;
+                previous = height;
+                length += Mathf.Sqrt(run * run + rise * rise);
+                if (run < .01f) continue;
+                maxSlope = Mathf.Max(maxSlope, Mathf.Abs(rise) / run);
+            }
+        }
+
+        private static Vector3 ChannelOutward(Vector3 floor, int side)
+        {
+            float x = floor.x / WorldScale;
+            const float probe = 2f;
+            float ahead = DesertArchesMesh.ChannelZ(x + probe);
+            float behind = DesertArchesMesh.ChannelZ(x - probe);
+            Vector3 tangent = new Vector3(probe * 2f * WorldScale, 0f, (ahead - behind) * WorldScale).normalized;
+            return new Vector3(-tangent.z, 0f, tangent.x) * side;
+        }
+
+        private static bool RimTarget(Vector3 floor, Vector3 outward, float level, System.Func<Vector3, float> ground, out Vector3 rim)
+        {
+            float floorHeight = ground(floor);
+            rim = Flat(floor + outward * RouteRimReach);
+            float highest = float.NegativeInfinity;
+            for (float distance = 8f; distance <= RouteRimReach; distance += 8f)
+            {
+                Vector3 point = Flat(floor + outward * distance);
+                float height = ground(point);
+                if (height >= level)
+                {
+                    rim = point;
+                    return true;
+                }
+                if (height <= highest) continue;
+                highest = height;
+                rim = point;
+            }
+            return highest >= floorHeight + 20f;
+        }
+
+        private static Vector3 Contour(Vector3 point, Vector3 forward, System.Func<Vector3, float> ground)
+        {
+            const float probe = 2f;
+            float dx = ground(point + new Vector3(probe, 0f, 0f)) - ground(point - new Vector3(probe, 0f, 0f));
+            float dz = ground(point + new Vector3(0f, 0f, probe)) - ground(point - new Vector3(0f, 0f, probe));
+            if (Mathf.Abs(dx) + Mathf.Abs(dz) < .01f) return new Vector3(-forward.z, 0f, forward.x);
+            Vector3 side = new Vector3(-dz, 0f, dx).normalized;
+            return Vector3.Dot(side, forward) < 0f ? -side : side;
+        }
+
+        private static bool RiseZigzag(Vector3 from, Vector3 to, List<Vector3> ladder, System.Func<Vector3, float> ground, int maxSteps = RouteZigzagSteps)
+        {
+            ladder.Clear();
+            Vector3 point = Flat(from);
+            float target = ground(to);
+            float high = ground(point);
+            int stale = 0;
+            int swing = 1;
+            for (int step = 0; step < maxSteps; step++)
+            {
+                if (ground(point) >= target - .5f) return true;
+                if (ground(point) > high + .25f) { high = ground(point); stale = 0; }
+                else if (++stale > 600) return false;
+                Vector3 heading = Flat(to - point);
+                if (heading.sqrMagnitude < .0001f) return true;
+                Vector3 forward = heading.normalized;
+                Vector3 side = Contour(point, forward, ground);
+                int bestSign = 0;
+                float bestScore = float.NegativeInfinity;
+                Vector3 bestLateral = point;
+                for (int attempt = 0; attempt < 4; attempt++)
+                {
+                    float lateral = attempt < 2 ? RouteZigzagSide : RouteZigzagSide * .5f;
+                    int sign = attempt % 2 == 0 ? swing : -swing;
+                    Vector3 sideways = Flat(point + side * (sign * lateral));
+                    float height = ground(sideways);
+                    if (height < ground(point) - RouteZigzagDrop) continue;
+                    if (!AscentStep(point, sideways, ground)) continue;
+                    float score = height + (AscentStep(sideways, Flat(sideways + forward * RouteZigzagForward), ground) ? RouteZigzagForward * 2f : 0f);
+                    if (score <= bestScore) continue;
+                    bestScore = score;
+                    bestLateral = sideways;
+                    bestSign = sign;
+                }
+                if (bestSign == 0) return false;
+                ladder.Add(bestLateral);
+                point = bestLateral;
+                swing = bestSign;
+                bool advanced = false;
+                for (int attempt = 0; attempt < 4 && !advanced; attempt++)
+                {
+                    float distance = RouteZigzagForward * (attempt == 0 ? 1f : attempt == 1 ? .66f : attempt == 2 ? .4f : .26f);
+                    Vector3 up = Flat(point + forward * distance);
+                    if (!AscentStep(point, up, ground)) continue;
+                    ladder.Add(up);
+                    point = up;
+                    advanced = true;
+                }
+                for (int attempt = 0; attempt < 3 && !advanced; attempt++)
+                {
+                    float distance = RouteZigzagForward * (attempt == 0 ? .5f : attempt == 1 ? .34f : .22f);
+                    for (int sign = 1; sign >= -1 && !advanced; sign -= 2)
+                    {
+                        Vector3 diagonal = Flat(point + forward * distance + side * (sign * RouteZigzagSide * .5f));
+                        if (!AscentStep(point, diagonal, ground)) continue;
+                        ladder.Add(diagonal);
+                        point = diagonal;
+                        advanced = true;
+                    }
+                }
+            }
+            return ground(point) >= target - .5f;
+        }
+
+        private static bool AscentStep(Vector3 from, Vector3 to, System.Func<Vector3, float> ground)
+        {
+            float run = new Vector2(to.x - from.x, to.z - from.z).magnitude;
+            if (run < .01f) return false;
+            if (ground(to) - ground(from) > RouteAscentSlopeLimit * run) return false;
+            return !RouteRisersAscent(from, to, ground);
+        }
+
+        private static bool RouteRisersAscent(Vector3 from, Vector3 to, System.Func<Vector3, float> ground)
+        {
+            float run = new Vector2(to.x - from.x, to.z - from.z).magnitude;
+            if (run < .01f) return true;
+            float start = ground(from);
+            float end = ground(to);
+            if (end - start > RouteAscentSlopeLimit * run) return true;
+            if (start - end > RouteSegmentDropLimit) return true;
+            int probes = Mathf.Max(1, Mathf.CeilToInt(run / RouteAscentProbeStep));
+            float span = run / probes;
+            float previous = start;
+            float lowest = start;
+            for (int step = 1; step <= probes; step++)
+            {
+                float t = step / (float)probes;
+                float height = step == probes ? end : ground(Vector3.Lerp(Flat(from), Flat(to), t));
+                if (height - previous > RouteAscentProbeSlope * span) return true;
+                if (previous - height > RouteProbeDropLimit) return true;
+                if (height - start > RouteAscentSlopeLimit * (run * t) + .05f) return true;
+                previous = height;
+                lowest = Mathf.Min(lowest, height);
+            }
+            return start - lowest > RouteSegmentDropLimit;
+        }
+
+        private static int PlateauJoin(IList<Vector3> legacy, Vector3 from, System.Func<Vector3, float> ground)
+        {
+            float plateau = (DesertArchesMesh.FloorY + 70f) * WorldScale;
+            int first = -1;
+            for (int i = 0; i < legacy.Count; i++)
+            {
+                if (ground(legacy[i]) < plateau) continue;
+                first = i;
+                break;
+            }
+            if (first < 0) return legacy.Count - 1;
+            Vector3 farSummit = ToWorld(new Vector3(sites[1].summit.x, 0f, sites[1].summit.z));
+            int window = first;
+            float windowDistance = float.PositiveInfinity;
+            for (int i = first; i < legacy.Count; i++)
+            {
+                float distance = Vector2.Distance(new Vector2(legacy[i].x, legacy[i].z), new Vector2(farSummit.x, farSummit.z));
+                if (distance >= windowDistance) continue;
+                windowDistance = distance;
+                window = i;
+            }
+            int join = first;
+            float best = float.PositiveInfinity;
+            for (int i = first; i < window; i++)
+            {
+                float distance = Vector2.Distance(new Vector2(legacy[i].x, legacy[i].z), new Vector2(from.x, from.z));
+                if (distance >= best) continue;
+                best = distance;
+                join = i;
+            }
+            return join;
+        }
+
+        private static void VerifyRoute(Vector3[] route, Vector3 start, Ascent ascent, int join, System.Func<Vector3, float> ground)
+        {
+            bool all = true, climb = true;
+            float maxSlope = 0f, maxRise = 0f;
+            int steep = 0, rises = 0;
+            for (int i = 0; i < route.Length - 1; i++)
+            {
+                float run = Vector2.Distance(new Vector2(route[i].x, route[i].z), new Vector2(route[i + 1].x, route[i + 1].z));
+                if (run < .01f) continue;
+                float slope = (route[i + 1].y - route[i].y) / run;
+                maxSlope = Mathf.Max(maxSlope, Mathf.Abs(slope));
+                maxRise = Mathf.Max(maxRise, slope);
+                if (RouteSteep(route[i], route[i + 1], ground)) { all = false; steep++; }
+                if (slope > RouteClimbLimit + .02f) { climb = false; rises++; }
+            }
+            Debug.Log("ROUTE_STEEP_OK DesertArches all=" + all + " maxSlope=" + maxSlope.ToString("0.00")
+                + " steep=" + steep + "/" + (route.Length - 1));
+            Debug.Log("ROUTE_CLIMB_OK DesertArches all=" + climb + " maxSlope=" + maxRise.ToString("0.00")
+                + " steep=" + rises + "/" + (route.Length - 1));
+            Debug.Log("ROUTE_START DesertArches start=" + RoundPoint(start, ground) + " waypoints=" + route.Length);
+            Debug.Log("ROUTE_ASCENT DesertArches at=" + RoundPoint(ascent.floor, ground) + " rim=" + RoundPoint(ascent.rim, ground)
+                + " climb=" + Mathf.RoundToInt(ground(ascent.rim) - ground(ascent.floor))
+                + "m strict=" + ascent.strict + " joined=" + ascent.joined + " steps=" + ascent.ladder.Count
+                + " length=" + Mathf.RoundToInt(ascent.length) + "m maxSlope=" + ascent.maxSlope.ToString("0.00") + " join=" + join);
+        }
+
+        private static string RoundPoint(Vector3 point, System.Func<Vector3, float> ground)
+        {
+            return Mathf.RoundToInt(point.x) + "," + Mathf.RoundToInt(ground(point)) + "," + Mathf.RoundToInt(point.z);
+        }
+
+        private static List<Vector3> RouteContours(IList<Vector3> source, System.Func<Vector3, float> ground)
+        {
+            var points = new List<Vector3>(source);
+            var output = new List<Vector3>(points.Count) { Flat(points[0]) };
+            var detoured = new HashSet<Vector4>();
+            int budget = RouteDetourBudget;
+            int detours = 0, inserted = 0, straight = 0;
+            int index = 0;
+            while (index < points.Count - 1)
+            {
+                Vector3 current = points[index];
+                Vector3 next = points[index + 1];
+                List<Vector3> chain = null;
+                Vector3 resume = next;
+                if (budget > 0 && RouteSteep(current, next, ground) && detoured.Add(RouteKey(current, next)))
+                    RouteContour(current, next, ground, out chain, out resume);
+                if (chain == null)
+                {
+                    if (RouteSteep(current, next, ground)) straight++;
+                    output.Add(Flat(next));
+                    index++;
+                    continue;
+                }
+                Vector3 after = index + 2 < points.Count ? points[index + 2] : resume;
+                List<Vector3> ladder = RouteLadder(resume, after);
+                chain.Add(resume);
+                chain.AddRange(ladder);
+                budget -= chain.Count;
+                detours++;
+                inserted += chain.Count;
+                points.RemoveAt(index + 1);
+                points.InsertRange(index + 1, chain);
+            }
+            Debug.Log("ROUTE_CONTOUR DesertArches detours=" + detours + " inserted=" + inserted + " straight=" + straight);
+            return output;
+        }
+
+        private static List<Vector3> RouteLadder(Vector3 from, Vector3 to)
+        {
+            var points = new List<Vector3>();
+            Vector3 heading = new Vector3(to.x - from.x, 0f, to.z - from.z);
+            float run = heading.magnitude;
+            if (run <= RouteStep) return points;
+            int steps = Mathf.CeilToInt(run / RouteStep);
+            for (int step = 1; step < steps; step++)
+                points.Add(Flat(Vector3.Lerp(from, to, step / (float)steps)));
+            return points;
+        }
+
+        private static void RouteContour(Vector3 from, Vector3 to, System.Func<Vector3, float> ground, out List<Vector3> chain, out Vector3 resume)
+        {
+            chain = null;
+            resume = to;
+            Vector3 heading = new Vector3(to.x - from.x, 0f, to.z - from.z);
+            if (heading.sqrMagnitude < .0001f) return;
+            Vector3 direction = heading.normalized;
+            Vector3 side = new Vector3(-direction.z, 0f, direction.x);
+            int best = int.MaxValue;
+            for (int sign = 1; sign >= -1; sign -= 2)
+            {
+                Vector3 found;
+                List<Vector3> candidate = RouteContourSide(from, direction, side * sign, ground, out found);
+                if (candidate != null && candidate.Count < best)
+                {
+                    best = candidate.Count;
+                    chain = candidate;
+                    resume = found;
+                }
+            }
+        }
+
+        private static List<Vector3> RouteContourSide(Vector3 from, Vector3 direction, Vector3 side, System.Func<Vector3, float> ground, out Vector3 resume, float ahead = RouteStep)
+        {
+            var chain = new List<Vector3>();
+            Vector3 previous = Flat(from);
+            Vector3 forward = direction * ahead;
+            resume = from;
+            bool closed = false;
+            for (int step = 1; step <= RouteSidestepMax; step++)
+            {
+                Vector3 candidate = Flat(from + side * (step * RouteSidestep));
+                if (RouteSteep(previous, candidate, ground)) break;
+                chain.Add(candidate);
+                if (!RouteSteep(candidate, Flat(candidate + forward), ground))
+                {
+                    resume = Flat(candidate + forward);
+                    closed = true;
+                    break;
+                }
+                previous = candidate;
+            }
+            if (!closed) return null;
+
+            const float heightGap = 1.2f;
+            var heights = new float[chain.Count];
+            for (int i = 0; i < chain.Count; i++) heights[i] = ground(chain[i]);
+            var smoothed = new float[chain.Count];
+            for (int i = 0; i < chain.Count; i++)
+            {
+                smoothed[i] = i == 0 || i == chain.Count - 1
+                    ? heights[i]
+                    : Mathf.Max(Mathf.Min(heights[i - 1], heights[i]), Mathf.Min(Mathf.Max(heights[i - 1], heights[i]), heights[i + 1]));
+            }
+            var kept = new List<Vector3>(chain.Count);
+            var keptHeights = new List<float>(chain.Count);
+            for (int i = 0; i < chain.Count; i++)
+            {
+                if (keptHeights.Count > 0 && Mathf.Abs(smoothed[i] - keptHeights[keptHeights.Count - 1]) > heightGap) continue;
+                chain[i] = new Vector3(chain[i].x, smoothed[i], chain[i].z);
+                kept.Add(chain[i]);
+                keptHeights.Add(smoothed[i]);
+            }
+            System.Func<Vector3, float> profile = point =>
+            {
+                for (int i = 0; i < kept.Count; i++)
+                {
+                    if (Mathf.Abs(kept[i].x - point.x) > .0001f || Mathf.Abs(kept[i].z - point.z) > .0001f) continue;
+                    return keptHeights[i];
+                }
+                return ground(point);
+            };
+            Vector3 cursor = Flat(from);
+            for (int i = 0; i < kept.Count; i++)
+            {
+                if (RouteRisersAscent(cursor, kept[i], profile)) return null;
+                cursor = kept[i];
+            }
+            return kept;
+        }
+
+        private static List<Vector3> RouteCapsule(IList<Vector3> source, System.Func<Vector3, float> ground)
+        {
+            if (source.Count < 2) return new List<Vector3>(source);
+            var points = new List<Vector3>(source.Count);
+            for (int i = 0; i < source.Count; i++) points.Add(Flat(source[i]));
+            var output = new List<Vector3>(points.Count) { points[0] };
+            int budget = RouteDetourBudget;
+            int hazards = 0, shifts = 0, detours = 0, forced = 0, paths = 0, skipped = 0, inserted = 0, groomed = 0;
+            var perSpot = new int[RouteRepairSpots.Length];
+            int forcedSpot = -1;
+            int index = 0;
+            while (index < points.Count - 1)
+            {
+                Vector3 current = points[index];
+                Vector3 next = points[index + 1];
+                Vector3 heading = new Vector3(next.x - current.x, 0f, next.z - current.z);
+                float run = heading.magnitude;
+                if (run < .01f)
+                {
+                    output.Add(next);
+                    index++;
+                    continue;
+                }
+                Vector3 side = new Vector3(-heading.z / run, 0f, heading.x / run);
+                int spot = RouteRepairSpot(current, next);
+                if (spot < 0) forcedSpot = -1;
+                float edge = RouteCapsuleEdge(current, next, side, ground);
+                bool hazardous = edge != 0f;
+                if (hazardous)
+                {
+                    hazards++;
+                    Vector3 moved = Flat(next - side * (Mathf.Sign(edge) * RouteCapsuleShift));
+                    if (RouteCapsuleEdge(current, moved, side, ground) == 0f && !RouteSteep(current, moved, ground))
+                    {
+                        points[index + 1] = moved;
+                        next = moved;
+                        hazardous = false;
+                        shifts++;
+                    }
+                }
+                if (!hazardous && !(spot >= 0 && spot != forcedSpot))
+                {
+                    output.Add(next);
+                    index++;
+                    continue;
+                }
+                List<Vector3> chain = RouteCapsuleDetour(current, next, side, ground, ref budget, ref paths);
+                if (chain == null || (!hazardous && chain.Count > RouteCapsuleDetourSteps))
+                {
+                    if (chain != null) skipped++;
+                    if (spot >= 0) forcedSpot = spot;
+                    output.Add(next);
+                    index++;
+                    continue;
+                }
+                Vector3 resume = chain[chain.Count - 1];
+                bool terminal = index + 2 >= points.Count;
+                Vector3 after = terminal ? next : points[index + 2];
+                chain.AddRange(RouteLadder(resume, after));
+                if (terminal && Vector2.Distance(new Vector2(resume.x, resume.z), new Vector2(next.x, next.z)) > .01f)
+                    chain.Add(Flat(next));
+                groomed += RouteCapsuleGroom(chain, ground);
+                budget -= chain.Count;
+                points.RemoveAt(index + 1);
+                points.InsertRange(index + 1, chain);
+                for (int i = 0; i < chain.Count; i++) output.Add(Flat(points[index + 1 + i]));
+                index += chain.Count;
+                detours++;
+                inserted += chain.Count;
+                if (spot >= 0)
+                {
+                    forced++;
+                    perSpot[spot]++;
+                    forcedSpot = spot;
+                }
+            }
+            int remaining = 0;
+            for (int i = 0; i < output.Count - 1; i++)
+            {
+                Vector3 heading = new Vector3(output[i + 1].x - output[i].x, 0f, output[i + 1].z - output[i].z);
+                float run = heading.magnitude;
+                if (run < .01f) continue;
+                Vector3 side = new Vector3(-heading.z / run, 0f, heading.x / run);
+                if (RouteCapsuleEdge(output[i], output[i + 1], side, ground) != 0f) remaining++;
+            }
+            Debug.Log("ROUTE_CAPSULE DesertArches hazards=" + hazards + " shifts=" + shifts + " detours=" + detours
+                + " forced=" + forced + " paths=" + paths + " skipped=" + skipped + " inserted=" + inserted
+                + " groomed=" + groomed + " remaining=" + remaining + " budget=" + budget
+                + " spots=" + perSpot[0] + "," + perSpot[1] + "," + perSpot[2]);
+            return output;
+        }
+
+        private static int RouteCapsuleGroom(List<Vector3> chain, System.Func<Vector3, float> ground)
+        {
+            int fixedPoints = 0;
+            for (int i = 1; i < chain.Count; i++)
+            {
+                Vector3 heading = new Vector3(chain[i].x - chain[i - 1].x, 0f, chain[i].z - chain[i - 1].z);
+                float run = heading.magnitude;
+                if (run < .01f) continue;
+                Vector3 side = new Vector3(-heading.z / run, 0f, heading.x / run);
+                float edge = RouteCapsuleLedge(chain[i], side, ground);
+                if (edge == 0f) continue;
+                Vector3 moved = Flat(chain[i] - side * (Mathf.Sign(edge) * RouteCapsuleShift));
+                if (RouteCapsuleLedge(moved, side, ground) != 0f) continue;
+                if (RouteSteep(chain[i - 1], moved, ground)) continue;
+                chain[i] = moved;
+                fixedPoints++;
+            }
+            return fixedPoints;
+        }
+
+        private static float RouteCapsuleEdge(Vector3 from, Vector3 to, Vector3 side, System.Func<Vector3, float> ground)
+        {
+            float run = new Vector2(to.x - from.x, to.z - from.z).magnitude;
+            int steps = Mathf.Clamp(Mathf.CeilToInt(run), 1, RouteCapsuleProbeSteps);
+            Vector3 start = Flat(from);
+            Vector3 end = Flat(to);
+            float worst = 0f, magnitude = 0f;
+            for (int step = 1; step <= steps; step++)
+            {
+                float edge = RouteCapsuleLedge(Vector3.Lerp(start, end, step / (float)steps), side, ground);
+                if (Mathf.Abs(edge) <= magnitude) continue;
+                magnitude = Mathf.Abs(edge);
+                worst = edge;
+            }
+            return worst;
+        }
+
+        private static float RouteCapsuleLedge(Vector3 point, Vector3 side, System.Func<Vector3, float> ground)
+        {
+            float middle = ground(point);
+            float right = middle - ground(point + side * RouteCapsuleHalfWidth);
+            float left = middle - ground(point - side * RouteCapsuleHalfWidth);
+            if (right > RouteCapsuleEdgeDrop && right >= left) return right;
+            if (left > RouteCapsuleEdgeDrop) return -left;
+            return 0f;
+        }
+
+        private static int RouteRepairSpot(Vector3 from, Vector3 to)
+        {
+            Vector3 middle = new Vector3((from.x + to.x) * .5f, 0f, (from.z + to.z) * .5f);
+            float radius = RouteRepairRadius * RouteRepairRadius;
+            for (int i = 0; i < RouteRepairSpots.Length; i++)
+            {
+                Vector3 spot = RouteRepairSpots[i];
+                if (Near(middle, spot, radius) || Near(from, spot, radius) || Near(to, spot, radius)) return i;
+            }
+            return -1;
+        }
+
+        private static bool Near(Vector3 point, Vector3 spot, float limit)
+        {
+            float dx = point.x - spot.x;
+            float dz = point.z - spot.z;
+            return dx * dx + dz * dz <= limit;
+        }
+
+        private static List<Vector3> RouteCapsuleDetour(Vector3 from, Vector3 to, Vector3 side, System.Func<Vector3, float> ground,
+            ref int budget, ref int paths)
+        {
+            Vector3 heading = new Vector3(to.x - from.x, 0f, to.z - from.z);
+            float run = heading.magnitude;
+            if (run < .01f || budget <= 0) return null;
+            Vector3 direction = heading / run;
+            List<Vector3> best = null;
+            Vector3 bestResume = to;
+            float ahead = Mathf.Clamp(run, 1f, RouteStep);
+            for (int sign = 1; sign >= -1; sign -= 2)
+            {
+                paths++;
+                List<Vector3> candidate = RouteContourSide(from, direction, side * sign, ground, out Vector3 resume, ahead);
+                if (candidate == null || candidate.Count == 0) continue;
+                if (best != null && candidate.Count >= best.Count) continue;
+                best = candidate;
+                bestResume = resume;
+            }
+            if (best == null) return null;
+            best.Add(Flat(bestResume));
+            return best;
+        }
+
+        private static bool RouteSteep(Vector3 from, Vector3 to, System.Func<Vector3, float> ground)
+        {
+            Vector3 heading = new Vector3(to.x - from.x, 0f, to.z - from.z);
+            float run = heading.magnitude;
+            if (run < .001f) return false;
+            if (ground(to) > ground(from) + RouteRiseLimit) return true;
+            Vector3 direction = heading / run;
+            Vector3 middle = new Vector3((from.x + to.x) * .5f, 0f, (from.z + to.z) * .5f);
+            float ahead = ground(middle + direction * (run * .5f));
+            float behind = ground(middle - direction * (run * .5f));
+            if (Mathf.Abs(ahead - behind) / run > RouteSlopeLimit) return true;
+            return RouteRisers(from, to, ground);
+        }
+
+        private static bool RouteRisers(Vector3 from, Vector3 to, System.Func<Vector3, float> ground)
+        {
+            float start = ground(from);
+            float end = ground(to);
+            if (end - start > RouteSegmentRiseLimit) return true;
+            if (start - end > RouteSegmentDropLimit) return true;
+            float previous = start;
+            float lowest = start;
+            for (int step = 1; step <= RouteProbeSteps; step++)
+            {
+                float t = step / (float)RouteProbeSteps;
+                float height = step == RouteProbeSteps ? end : ground(Vector3.Lerp(Flat(from), Flat(to), t));
+                if (height - previous > RouteProbeRiseLimit) return true;
+                if (previous - height > RouteProbeDropLimit) return true;
+                previous = height;
+                lowest = Mathf.Min(lowest, height);
+            }
+            if (start - lowest > RouteSegmentDropLimit) return true;
+            return false;
+        }
+
+        private static Vector3 Flat(Vector3 point)
+        {
+            return new Vector3(point.x, 0f, point.z);
+        }
+
+        private static Vector4 RouteKey(Vector3 from, Vector3 to)
+        {
+            return new Vector4(Mathf.Round(from.x), Mathf.Round(from.z), Mathf.Round(to.x), Mathf.Round(to.z));
         }
 
         private static float RouteGround(Vector3 world)
@@ -1475,7 +2312,11 @@ namespace GoatDescent.EditorTools
             item.isStatic = true;
             item.AddComponent<MeshFilter>().sharedMesh = mesh;
             item.AddComponent<MeshRenderer>().sharedMaterial = material;
-            if (collider) item.AddComponent<MeshCollider>().sharedMesh = mesh;
+            if (collider)
+            {
+                item.AddComponent<MeshCollider>().sharedMesh = mesh;
+                item.AddComponent<GoatDescent.MountainSlopeSurface>();
+            }
             return item.transform;
         }
 

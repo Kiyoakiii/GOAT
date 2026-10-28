@@ -212,10 +212,35 @@ namespace GoatDescent.Levels
 
         public Mesh Build(string name)
         {
+            int repaired = 0;
+            for (int i = 0; i < vertices.Count; i++)
+            {
+                if (IsFinite(vertices[i])) continue;
+                vertices[i] = NearestFinite(vertices, i);
+                repaired++;
+            }
+            if (repaired > 0) Debug.LogWarning($"NON_FINITE_VERTICES mesh={name} repaired={repaired}");
             var mesh = new Mesh { name = name, indexFormat = vertices.Count > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16 };
             mesh.SetVertices(vertices); mesh.SetTriangles(triangles, 0); mesh.SetColors(colors);
             mesh.RecalculateNormals(); mesh.RecalculateBounds();
             return mesh;
+        }
+
+        private static bool IsFinite(Vector3 v)
+        {
+            return float.IsFinite(v.x) && float.IsFinite(v.y) && float.IsFinite(v.z);
+        }
+
+        private static Vector3 NearestFinite(List<Vector3> vertices, int index)
+        {
+            for (int step = 1; step < vertices.Count; step++)
+            {
+                int before = index - step;
+                if (before >= 0 && IsFinite(vertices[before])) return vertices[before];
+                int after = index + step;
+                if (after < vertices.Count && IsFinite(vertices[after])) return vertices[after];
+            }
+            return Vector3.zero;
         }
     }
 }

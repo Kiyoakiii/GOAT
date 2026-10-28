@@ -221,6 +221,18 @@ namespace GoatDescent.EditorTools
             Debug.Log("ROUTE_SHOTS FrozenRift count=" + rendered);
         }
 
+        public static Vector3[] PlayRoute()
+        {
+            var path = ResampleRoute(TrailRoute(), 4f / WorldScale);
+            var result = new Vector3[path.Count];
+            for (int i = 0; i < path.Count; i++)
+            {
+                Vector3 world = path[i] * WorldScale;
+                result[i] = new Vector3(world.x, RouteGround(world), world.z);
+            }
+            return result;
+        }
+
         private static Vector3 ClearRouteEye(Vector3 eye, Vector3 look, out int lift)
         {
             lift = 0;
@@ -941,7 +953,11 @@ namespace GoatDescent.EditorTools
             var item = new GameObject(name); item.transform.SetParent(parent, false); item.transform.localPosition = position;
             item.transform.localScale = scale; item.AddComponent<MeshFilter>().sharedMesh = mesh;
             item.AddComponent<MeshRenderer>().sharedMaterial = material; item.isStatic = true;
-            if (collider) item.AddComponent<MeshCollider>().sharedMesh = mesh;
+            if (collider)
+            {
+                item.AddComponent<MeshCollider>().sharedMesh = mesh;
+                item.AddComponent<GoatDescent.MountainSlopeSurface>();
+            }
             return item.transform;
         }
 
