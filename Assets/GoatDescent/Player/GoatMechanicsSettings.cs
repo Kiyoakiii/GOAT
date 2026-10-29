@@ -46,6 +46,10 @@ namespace GoatDescent
         [Min(0f)] public float jumpBuffer=.15f;
 
         [Header("Ground movement and balance")]
+        [Tooltip("Scales hit and shove impulses. Does not affect jumps or momentum shared when catching a partner.")]
+        [Range(.1f,1f)] public float impactResponse=.65f;
+        [Tooltip("Scales the time before full movement control returns after a hit.")]
+        [Range(.1f,1f)] public float impactRecovery=.7f;
         [Min(.1f)] public float maxGroundSpeed=5.35f;
         [Min(.1f)] public float groundAcceleration=19f;
         [Min(0f)] public float airAcceleration=5f;

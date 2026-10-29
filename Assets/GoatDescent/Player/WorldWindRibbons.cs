@@ -12,6 +12,13 @@ namespace GoatDescent
         private Material material;
         private Vector3[] vertices;
         private Color[] colors;
+        private readonly float[] tapers = new float[Segments + 1];
+        private readonly CurveSample[] curve = new CurveSample[Count * (Segments + 1)];
+
+        private struct CurveSample
+        {
+            public float along, sin, cos, sinSlow, cosSlow, sinFast, cosFast;
+        }
 
         private void Awake()
         {
@@ -21,10 +28,23 @@ namespace GoatDescent
             colors = new Color[vertices.Length];
             var uv = new Vector2[vertices.Length];
             var indices = new int[Count * Segments * 6];
+            for (int s = 0; s <= Segments; s++)
+                tapers[s] = s == 0 || s == Segments ? 0f
+                    : Mathf.Pow(Mathf.Max(0f, Mathf.Sin((float)s / Segments * Mathf.PI)), .65f);
             for (int r = 0; r < Count; r++)
             for (int s = 0; s <= Segments; s++)
             {
                 int v = (r * (Segments + 1) + s) * 2;
+                bool far = r >= 112;
+                float length = Mathf.Lerp(far ? 22 : 11, far ? 42 : 27, Seed(r, .618034f));
+                float along = ((float)s / Segments - .5f) * length;
+                float angle = Seed(r, .414214f) * Mathf.PI * 2 + along * .23f;
+                curve[v / 2] = new CurveSample
+                {
+                    along = along, sin = Mathf.Sin(angle), cos = Mathf.Cos(angle),
+                    sinSlow = Mathf.Sin(angle * .83f), cosSlow = Mathf.Cos(angle * .83f),
+                    sinFast = Mathf.Sin(angle * 1.9f), cosFast = Mathf.Cos(angle * 1.9f)
+                };
                 uv[v] = new Vector2((float)s / Segments, 0);
                 uv[v + 1] = new Vector2((float)s / Segments, 1);
                 if (s == Segments) continue;
@@ -63,12 +83,17 @@ namespace GoatDescent
             Vector3 forward = weather.WindDirection;
             Vector3 right = Vector3.Cross(Vector3.up, forward);
             float cx = Vector3.Dot(eye, right), cz = Vector3.Dot(eye, forward);
+            // Angle addition reuses each curve's fixed shape. Only six trig calls
+            // per camera update instead of six for every segment of every ribbon.
+            float time = weather.Clock * .32f;
+            float sinTime = Mathf.Sin(time), cosTime = Mathf.Cos(time);
+            float sinSlow = Mathf.Sin(time * .83f), cosSlow = Mathf.Cos(time * .83f);
+            float sinFast = Mathf.Sin(time * 1.9f), cosFast = Mathf.Cos(time * 1.9f);
             for (int r = 0; r < Count; r++)
             {
                 bool far = r >= 112;
                 float span = far ? 180 : 76, height = far ? 76 : 32;
-                float seed = Seed(r, .618034f), phase = Seed(r, .414214f) * Mathf.PI * 2;
-                float length = Mathf.Lerp(far ? 22 : 11, far ? 42 : 27, seed);
+                float seed = Seed(r, .618034f);
                 float x = Wrap(Seed(r, .75488f) * span, cx, span);
                 float y = Wrap(Seed(r, .56984f) * height, eye.y + height * .1f, height);
                 // Each streamline travels in the same direction, with gentle layered gusts.
@@ -82,16 +107,21 @@ namespace GoatDescent
                 float grey = Mathf.Lerp(.74f, 1, seed);
                 for (int s = 0; s <= Segments; s++)
                 {
-                    float u = (float)s / Segments, along = (u - .5f) * length;
-                    float curl = phase + along * .23f + weather.Clock * .32f;
-                    Vector3 p = right * (x + Mathf.Sin(curl) * 1.15f)
-                        + Vector3.up * (y + Mathf.Cos(curl * .83f) * .65f + Mathf.Sin(curl * 1.9f) * .13f)
-                        + forward * (z + along);
-                    Vector3 tangent = forward + right * (Mathf.Cos(curl) * .2645f)
-                        - Vector3.up * (Mathf.Sin(curl * .83f) * .124f + Mathf.Cos(curl * 1.9f) * -.057f);
-                    Vector3 across = Vector3.Cross(tangent, eye - p).normalized;
-                    float taper = Mathf.Pow(Mathf.Sin(u * Mathf.PI), .65f);
                     int v = (r * (Segments + 1) + s) * 2;
+                    var sample = curve[v / 2];
+                    float wave = sample.sin * cosTime + sample.cos * sinTime;
+                    float waveCos = sample.cos * cosTime - sample.sin * sinTime;
+                    float slow = sample.sinSlow * cosSlow + sample.cosSlow * sinSlow;
+                    float slowCos = sample.cosSlow * cosSlow - sample.sinSlow * sinSlow;
+                    float fast = sample.sinFast * cosFast + sample.cosFast * sinFast;
+                    float fastCos = sample.cosFast * cosFast - sample.sinFast * sinFast;
+                    Vector3 p = right * (x + wave * 1.15f)
+                        + Vector3.up * (y + slowCos * .65f + fast * .13f)
+                        + forward * (z + sample.along);
+                    Vector3 tangent = forward + right * (waveCos * .2645f)
+                        - Vector3.up * (slow * .124f + fastCos * -.057f);
+                    Vector3 across = Vector3.Cross(tangent, eye - p).normalized;
+                    float taper = tapers[s];
                     vertices[v] = p - across * width * taper;
                     vertices[v + 1] = p + across * width * taper;
                     float nearFade = Fade(1.5f, 5f, Vector3.Distance(eye, p));

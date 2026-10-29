@@ -11,11 +11,13 @@ Shader "GoatDescent/Ibex Fibers"
     }
     SubShader
     {
-        Tags { "RenderType"="Opaque" }
+        // The underlying coat and horns supply the goat's shadow.
+        // Thousands of sub-pixel fibers are too expensive in every shadow cascade.
+        Tags { "RenderType"="Opaque" "ForceNoShadowCasting"="True" }
         LOD 200
         Cull Off
         CGPROGRAM
-        #pragma surface surf Standard fullforwardshadows vertex:vert addshadow
+        #pragma surface surf Standard fullforwardshadows vertex:vert
         #pragma target 3.0
         #include "../../Resources/GoatFurShading.cginc"
         struct Input { float4 tint; float2 uv_MainTex; };
@@ -43,5 +45,5 @@ Shader "GoatDescent/Ibex Fibers"
         }
         ENDCG
     }
-    FallBack "Diffuse"
+    FallBack Off
 }

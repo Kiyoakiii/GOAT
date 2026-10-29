@@ -316,8 +316,9 @@ namespace GoatDescent
             var caughtRig = best.GetComponent<GoatPhysicalBody>();
             float ownMass = ownRig.TotalSimulatedMass, otherMass = caughtRig.TotalSimulatedMass;
             Vector3 shared = (ownVelocity*ownMass + otherVelocity*otherMass)/(ownMass+otherMass);
-            motor.ReceiveImpulse((shared-ownVelocity)*body.mass,1.1f);
-            best.motor.ReceiveImpulse((shared-otherVelocity)*best.body.mass,1.1f);
+            // Catching shares momentum between the pair; this is not a hit.
+            motor.ReceiveImpulse((shared-ownVelocity)*body.mass,1.1f,false);
+            best.motor.ReceiveImpulse((shared-otherVelocity)*best.body.mass,1.1f,false);
             ownRig.ApplyCatchVelocityChange(shared-ownVelocity);
             caughtRig.ApplyCatchVelocityChange(shared-otherVelocity);
             best.GetComponent<GoatCliffGrip>()?.BreakGrip(.7f);

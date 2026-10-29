@@ -43,6 +43,8 @@ MonoBehaviour:
   coyoteTime: 0.12
   jumpBuffer: 0.15
   maxGroundSpeed: 5.35
+  impactResponse: 0.65
+  impactRecovery: 0.7
   groundAcceleration: 19
   airAcceleration: 5
   steepGripAngle: 73

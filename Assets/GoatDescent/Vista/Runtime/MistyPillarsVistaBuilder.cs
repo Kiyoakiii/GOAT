@@ -122,6 +122,7 @@ namespace GoatDescent.ProceduralWorld
             var stoneObject = sink.Emit(tower.transform, RockObjectName, "Cliff_" + spec.seed, stone, rock, true);
             var surface = stoneObject.AddComponent<MeshCollider>();
             surface.sharedMesh = stoneObject.GetComponent<MeshFilter>().sharedMesh;
+            if (sink is RuntimeMeshSink runtimeSink) runtimeSink.CompleteCollisionMesh(stoneObject);
             stoneObject.AddComponent<GoatDescent.MountainSlopeSurface>();
             Transform marker = spec.seed == SpawnTowerSeed ? CreateSpawnMarker(tower.transform, surface, spec.height, strictSpawnMarker) : null;
 

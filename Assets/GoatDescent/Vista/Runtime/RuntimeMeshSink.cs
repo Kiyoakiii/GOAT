@@ -22,13 +22,22 @@ namespace GoatDescent.ProceduralWorld
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             bool retain=retainSpawnMeshData && parent.name=="Forest pillar "+MistyPillarsVistaBuilder.SpawnTowerSeed;
-            mesh.UploadMeshData(!retain);
+            // The builder attaches the rock collider after Emit returns. A player
+            // cannot cook its collision mesh after CPU geometry has been discarded.
+            bool pendingCollision = objectName == MistyPillarsVistaBuilder.RockObjectName;
+            mesh.UploadMeshData(!retain && !pendingCollision);
             assets.Add(mesh);
             var obj = new GameObject(objectName);
             obj.transform.SetParent(parent, false);
             obj.AddComponent<MeshFilter>().sharedMesh = mesh;
             obj.AddComponent<MeshRenderer>().sharedMaterial = material;
             return obj;
+        }
+
+        internal void CompleteCollisionMesh(GameObject obj)
+        {
+            bool retain = retainSpawnMeshData && obj.transform.parent.name == "Forest pillar " + MistyPillarsVistaBuilder.SpawnTowerSeed;
+            if (!retain) obj.GetComponent<MeshFilter>().sharedMesh.UploadMeshData(true);
         }
     }
 }

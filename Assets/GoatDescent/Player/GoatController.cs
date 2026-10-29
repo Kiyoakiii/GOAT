@@ -106,9 +106,14 @@ namespace GoatDescent
         public bool IsBracingForJump { get; set; }
         public void Configure(Rigidbody targetBody, GoatGroundDetector targetGround) { body = targetBody; ground = targetGround; }
         public void ClearInput() { input = Vector2.zero; moveDirection = Vector3.zero; IsBracingForJump = false; }
-        public void ReceiveImpulse(Vector3 impulse, float recoverySeconds)
+        public void ReceiveImpulse(Vector3 impulse, float recoverySeconds, bool isImpact = true)
         {
             CacheComponents();
+            if (isImpact)
+            {
+                impulse *= Tuning.impactResponse;
+                recoverySeconds *= Tuning.impactRecovery;
+            }
             if (impulse.magnitude > 8f) GetComponent<GoatEmotionController>()?.ReactToImpact(impulse.magnitude / 45f);
             externalImpulseUntil = Mathf.Max(externalImpulseUntil, Time.time + recoverySeconds);
             body.AddForce(impulse, ForceMode.Impulse);

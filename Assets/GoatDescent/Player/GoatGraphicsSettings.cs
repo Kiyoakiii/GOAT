@@ -80,6 +80,11 @@ namespace GoatDescent
             if ((int)QualitySettings.skinWeights < 4) QualitySettings.skinWeights = SkinWeights.FourBones;
             QualitySettings.shadows = current.shadows == 0 ? ShadowQuality.Disable : ShadowQuality.All;
             if (current.shadows > 0) QualitySettings.shadowResolution = (ShadowResolution)(current.shadows - 1);
+            // Four cascades across the old 750 m range submitted entire distant
+            // forests repeatedly. Spend the shadow budget around the players.
+            QualitySettings.shadowDistance = current.shadows >= 4 ? 350f : current.shadows == 3 ? 200f
+                : current.shadows == 2 ? 120f : 60f;
+            QualitySettings.shadowCascades = current.shadows >= 4 ? 4 : current.shadows >= 2 ? 2 : 0;
             QualitySettings.antiAliasing = current.antialiasing;
             QualitySettings.globalTextureMipmapLimit = current.textureLimit;
             QualitySettings.vSyncCount = current.vSync ? 1 : 0;

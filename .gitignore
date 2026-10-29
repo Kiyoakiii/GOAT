@@ -50,3 +50,27 @@ sysinfo.txt
 *.apk
 *.aab
 /ProjectAuditDetails.csv
+
+# Local captures, crash recovery and Blender backup saves
+/Captures/
+/Assets/_Recovery/
+/Assets/_Recovery.meta
+/Assets/Temp.meta
+*.blend1
+*.blend2
+*.blend1.meta
+*.blend2.meta
+
+# Optional high-detail ibex baking experiment (keep the working Art assets)
+/Tools/Blender/Generated/ReferenceIbex/
+/Assets/GoatDescent/Art/ReferenceIbex/IbexAppearanceMesh.asset*
+/Assets/GoatDescent/Art/ReferenceIbex/BakedSkin*.asset*
+/Assets/GoatDescent/Art/ReferenceIbex/Ibex_*.png*
+/Assets/GoatDescent/Art/ReferenceIbex/IbexWhite_*.png*
+/Assets/GoatDescent/Art/ReferenceIbex/Ibex_*.mat*
+/Assets/GoatDescent/Art/ReferenceIbex/IbexWhite_*.mat*
+
+# Unreferenced leftovers from the refined goat export
+/Assets/GoatDescent/Art/RefinedGoat/Default-Material.mat*
+/Assets/GoatDescent/Art/RefinedGoat/Goat Face _ eyelid fur.mat*
+/Assets/GoatDescent/Art/RefinedGoat/GoatPainted.png*
