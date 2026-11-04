@@ -68,19 +68,21 @@ Shader "GoatDescent/Sky"
                 float up = dir.y;
 
                 fixed3 skyCol = lerp(_SkyHorizon.rgb, _SkyZenith.rgb, pow(saturate(up), 0.6));
-                fixed3 groundCol = _GroundColor.rgb;
-                fixed3 col = up >= 0.0 ? skyCol : groundCol;
+                fixed3 col = up >= 0.0 ? skyCol : lerp(_SkyHorizon.rgb, _GroundColor.rgb, saturate(-up * 6.0));
 
                 float sunDot = saturate(dot(normalize(dir), normalize(_SunDir.xyz)));
                 float sunCore = pow(sunDot, 300.0) * _SunColor.rgb;
                 float glow = pow(sunDot, 6.0) * _SunColor.rgb * 0.4;
                 col += sunCore + glow;
 
-                float cloudBand = saturate(1.0 - abs(up) * 4.0);
-                float2 cloudUv = dir.xz / max(0.05, abs(dir.y)) * 0.4 + float2(3.7, 9.2);
-                float cloudShape = vnoise(cloudUv) * 0.6 + vnoise(cloudUv * 3.1) * 0.4;
-                float clouds = smoothstep(0.52, 0.75, cloudShape) * cloudBand * _CloudDensity;
-                col = lerp(col, _CloudColor.rgb, clouds * 0.85);
+                float cloudBand = smoothstep(0.015, 0.09, up);
+                float2 cloudUv = dir.xz / max(0.22, up) * 0.11 + float2(3.7, 9.2);
+                float cloudShape = vnoise(cloudUv) * 0.5 + vnoise(cloudUv * 2.7 + 13.1) * 0.3
+                    + vnoise(cloudUv * 6.3 + 31.7) * 0.2;
+                float coverage = lerp(0.62, 0.32, saturate(_CloudDensity));
+                float clouds = smoothstep(coverage, coverage + 0.24, cloudShape) * cloudBand;
+                float cloudShade = 0.8 + 0.2 * vnoise(cloudUv * 1.7 + 51.0);
+                col = lerp(col, _CloudColor.rgb * cloudShade, clouds);
 
                 return fixed4(col, 1.0);
             }

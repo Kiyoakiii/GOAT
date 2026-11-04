@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d9236a4c639b71bd13d1ef9a413c191e, type: 3}
+  m_Name: StoneCrown
+  m_EditorClassIdentifier: GoatDescent.Level::GoatDescent.Levels.LevelRecipe
+  levelName: "\u041A\u0430\u043C\u0435\u043D\u043D\u0430\u044F \u043A\u043E\u0440\u043E\u043D\u0430"
+  form: 0
+  seed: 7
+  biome: {fileID: 11400000, guid: 03205b05d5f3df1439a197566a7a511d, type: 2}
+  radius: 145
+  summitHeight: 215
+  valleyHeight: 8
+  episodes:
+  - title: "\u0412\u0435\u0440\u0445\u043D\u0438\u0435 \u043F\u043E\u043B\u043A\u0438"
+    challenge: 0
+    targetSeconds: 50
+    difficulty: 0.15
+  - title: "\u041A\u0440\u0430\u0439 \u0441\u043A\u0430\u043B\u044B"
+    challenge: 1
+    targetSeconds: 65
+    difficulty: 0.4
+  - title: "\u041A\u0430\u043C\u0435\u043D\u043D\u044B\u0435 \u0440\u0451\u0431\u0440\u0430"
+    challenge: 2
+    targetSeconds: 75
+    difficulty: 0.5
+  - title: "\u0420\u0430\u0437\u043B\u043E\u043C\u044B"
+    challenge: 3
+    targetSeconds: 80
+    difficulty: 0.65
+  - title: "\u0421\u043E\u0441\u043D\u043E\u0432\u0430\u044F \u0442\u0435\u0440\u0440\u0430\u0441\u0430"
+    challenge: 4
+    targetSeconds: 40
+    difficulty: 0.2
+  - title: "\u041D\u0438\u0436\u043D\u044F\u044F \u043A\u043E\u0440\u043E\u043D\u0430"
+    challenge: 5
+    targetSeconds: 90
+    difficulty: 0.75

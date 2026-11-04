@@ -2,7 +2,7 @@
   "dependencies": {
     "com.unity.netcode.gameobjects": "2.13.3",
     "com.unity.pipeline": "0.8.0-exp.1",
-    "com.unity.project-auditor": "1.0.2",
+    "com.unity.project-auditor": "2.0.0",
     "com.unity.services.multiplayer": "2.4.1",
     "com.unity.modules.animation": "1.0.0",
     "com.unity.modules.audio": "1.0.0",

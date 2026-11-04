@@ -9,7 +9,9 @@
         "GoatDescent.Bootstrap",
         "GoatDescent.ProceduralWorld.Runtime",
         "GoatDescent.ProceduralWorld.Editor",
-        "Unity.ProjectAuditor.Editor"
+        "Unity.ProjectAuditor.Editor",
+        "GoatDescent.Level",
+        "GoatDescent.AgentHarness"
     ],
     "includePlatforms": [
         "Editor"

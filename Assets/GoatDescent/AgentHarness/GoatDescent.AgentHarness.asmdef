@@ -1,0 +1,19 @@
+{
+    "name": "GoatDescent.AgentHarness",
+    "rootNamespace": "GoatDescent.Harness",
+    "references": [
+        "GoatDescent.Player",
+        "GoatDescent.Level",
+        "GoatDescent.Terrain",
+        "GoatDescent.Bootstrap"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

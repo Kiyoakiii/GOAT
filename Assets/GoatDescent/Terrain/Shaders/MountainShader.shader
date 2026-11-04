@@ -5,6 +5,8 @@ Shader "GoatDescent/Mountain"
         _DirtTex ("Dirt", 2D) = "white" {}
         _GrassTex ("Grass", 2D) = "white" {}
         _RockTex ("Rock", 2D) = "white" {}
+        _RockTint ("Rock Tint", Color) = (1, 1, 1, 1)
+        _GrassTint ("Grass Tint", Color) = (1, 1, 1, 1)
         _SnowTex ("Snow", 2D) = "white" {}
         _RockNormal ("Rock Normal", 2D) = "bump" {}
         _RockDetail ("Rock Detail Normal", 2D) = "bump" {}
@@ -61,6 +63,8 @@ Shader "GoatDescent/Mountain"
         float _RouteProgress;
         float _RouteSpacing;
         float4 _AtmoColor;
+        float4 _RockTint;
+        float4 _GrassTint;
         float _AtmoDensity;
 
         struct Input
@@ -125,12 +129,13 @@ Shader "GoatDescent/Mountain"
                 + dirtTop * triWeights.y
                 + StochasticSample(_DirtTex, IN.worldPos.xy * _Tiling) * triWeights.z;
             float3 dirtCol = lerp(dirtTop, dirtTri, smoothstep(_Steep * 0.55, _Steep + 0.15, slope));
-            float3 grassCol = StochasticSample(_GrassTex, uv);
+            float3 grassCol = StochasticSample(_GrassTex, uv) * _GrassTint.rgb;
             float3 rockTop = StochasticSample(_RockTex, uv);
             float3 rockTri = StochasticSample(_RockTex, IN.worldPos.zy * _Tiling) * triWeights.x
                 + rockTop * triWeights.y
                 + StochasticSample(_RockTex, IN.worldPos.xy * _Tiling) * triWeights.z;
             float3 rockCol = lerp(rockTop, rockTri, smoothstep(_Steep * 0.65, _Steep + 0.2, slope));
+            rockCol *= _RockTint.rgb;
             float3 snowCol = StochasticSample(_SnowTex, uv);
 
             float snowNoise = tex2D(_GrassTex, IN.worldPos.xz * (_Tiling * 0.37)).r;

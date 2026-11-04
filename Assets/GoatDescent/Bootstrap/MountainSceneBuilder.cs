@@ -1,3 +1,4 @@
+using GoatDescent.Levels;
 using UnityEngine;
 
 namespace GoatDescent
@@ -5,6 +6,9 @@ namespace GoatDescent
     public sealed class MountainSceneBuilder : MonoBehaviour
     {
         public MountainSettings settings = new MountainSettings();
+        [SerializeField] private LevelRecipe levelRecipe;
+        public LevelRecipe LevelRecipe => levelRecipe;
+        public void SetLevelRecipe(LevelRecipe value) => levelRecipe = value;
         public bool useGreenPillars = true;
         public bool useAnimationTestPlatform;
 
@@ -41,6 +45,11 @@ namespace GoatDescent
 
         public void BuildWorld()
         {
+            if (levelRecipe)
+            {
+                CrownLevelBuilder.Generate(this, levelRecipe, true);
+                return;
+            }
             if(useGreenPillars) { BuildPillarWorld(); return; }
             ClearBuilt();
             SetupEnvironment(settings);
@@ -77,7 +86,7 @@ namespace GoatDescent
             second.name = "Mountain Goat B";
             var follow = Camera.main.GetComponent<ThirdPersonGoatCamera>();
             gameObject.AddComponent<LocalGoatPair>().Configure(first, second, follow,
-                spawn, yaw, null, !useAnimationTestPlatform);
+                spawn, yaw, null, spawnSupplies: !useAnimationTestPlatform);
             ApplyPost(settings);
             if (!useAnimationTestPlatform && route != null && route.Count > 0)
             {
@@ -154,7 +163,7 @@ namespace GoatDescent
             }
             Camera.main.farClipPlane=2600f;
             gameObject.AddComponent<LocalGoatPair>().Configure(first,second,
-                Camera.main.GetComponent<ThirdPersonGoatCamera>(),spawn,yaw,marker.parent,!useAnimationTestPlatform);
+                Camera.main.GetComponent<ThirdPersonGoatCamera>(),spawn,yaw,marker.parent,spawnSupplies:!useAnimationTestPlatform);
             if(level)
             {
                 var cameraFollow=Camera.main.GetComponent<ThirdPersonGoatCamera>();
@@ -221,6 +230,16 @@ namespace GoatDescent
 
         public void RebuildTerrain()
         {
+            if (levelRecipe)
+            {
+                if (Application.isPlaying)
+                {
+                    Debug.LogWarning("Остановите Play Mode перед пересборкой маршрута уровня.", this);
+                    return;
+                }
+                CrownLevelBuilder.Generate(this, levelRecipe, false);
+                return;
+            }
             SetupEnvironment(settings);
             var root = transform.Find("Procedural Mountain");
             if (!root)
@@ -252,6 +271,11 @@ namespace GoatDescent
 
         public void ClearBuilt()
         {
+            if (levelRecipe)
+            {
+                CrownLevelBuilder.Clear(this);
+                return;
+            }
             for (int i = transform.childCount - 1; i >= 0; i--)
                 DestroyImmediate(transform.GetChild(i).gameObject);
             var sun = FindFirstObjectByType<Light>();
