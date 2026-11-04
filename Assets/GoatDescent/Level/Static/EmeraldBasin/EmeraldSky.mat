@@ -25,14 +25,14 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _CloudDensity: 0.55
+    - _CloudDensity: 0.25
     - _SunSize: 0.085
     m_Colors:
     - _CloudColor: {r: 1, g: 0.99, b: 0.96, a: 1}
     - _GroundColor: {r: 0.74, g: 0.82, b: 0.85, a: 1}
-    - _SkyHorizon: {r: 0.84, g: 0.9, b: 0.95, a: 1}
-    - _SkyZenith: {r: 0.3, g: 0.58, b: 0.93, a: 1}
+    - _SkyHorizon: {r: 0.57, g: 0.75, b: 0.92, a: 1}
+    - _SkyZenith: {r: 0.12, g: 0.41, b: 0.79, a: 1}
     - _SunColor: {r: 1, g: 0.96, b: 0.85, a: 1}
-    - _SunDir: {r: -0.1545085, g: 0.9510565, b: -0.26761657, a: 0}
+    - _SunDir: {r: -0.45198447, g: 0.6156615, b: -0.6455006, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

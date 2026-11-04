@@ -254,7 +254,6 @@ namespace GoatDescent.EditorTools
             for (int i = 0; i < path.Count; i++)
             {
                 Vector3 local = path[i];
-                local.y = TerracePeakMesh.GroundHeight(local);
                 result[i] = frame ? frame.TransformPoint(local) : local * 5f;
             }
             return result;

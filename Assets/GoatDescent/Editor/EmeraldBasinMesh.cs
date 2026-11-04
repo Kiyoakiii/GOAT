@@ -46,7 +46,8 @@ namespace GoatDescent.EditorTools
             float noise = Ring(angle, 3.1f + boundary * 9.7f, 2.7f) * .55f
                 + Ring(angle, 11.9f + boundary * 4.3f, 6.1f) * .30f
                 + Ring(angle, 7.7f + boundary * 6.1f, 12.7f) * .15f;
-            float radius = BoundaryRadius[boundary] * (1f + noise * .12f);
+            float shape = .15f * Mathf.Sin(angle * 2f + .7f) + .08f * Mathf.Sin(angle * 3f - 1.1f);
+            float radius = BoundaryRadius[boundary] * (1f + shape + noise * .065f);
             radius -= BreachMask(boundary, angle) * BoundaryRadius[boundary] * .06f;
             return radius;
         }
@@ -192,7 +193,7 @@ namespace GoatDescent.EditorTools
             float noise = Ring(angle, 6.4f + tier * 4.2f, 2.6f) * .55f
                 + Ring(angle, 13.7f + tier * 2.8f, 7.1f) * .30f
                 + Ring(angle, 9.3f + tier * 5.5f, 15.3f) * .15f;
-            return noise * 10f;
+            return noise * 24f + 24f * Mathf.Sin(angle * 2f + tier * .7f);
         }
 
         public static float WallHeight(int tier, float angle, float v)
@@ -202,7 +203,7 @@ namespace GoatDescent.EditorTools
             float y = Mathf.Lerp(baseY, rampY, CollapseMask(tier, angle));
             y += Mathf.Sin(v * 12f + tier) * 1.2f;
             y += Mathf.Sin(angle * 13f + tier * 3f) * 1.3f * Mathf.Sin(v * Mathf.PI);
-            y += ShelfWander(tier, angle) * v * v;
+            y += Mathf.Lerp(tier > 1 ? ShelfWander(tier - 1, angle) : 0f, ShelfWander(tier, angle), v);
             return y;
         }
 

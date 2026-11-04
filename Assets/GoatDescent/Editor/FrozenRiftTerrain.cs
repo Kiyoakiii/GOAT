@@ -5,7 +5,7 @@ namespace GoatDescent.EditorTools
     internal static class FrozenRiftTerrain
     {
         public const float Extent = 1450f;
-        public const int Grid = 200;
+        public const int Grid = 300;
         public const int Tiers = 4;
         public const float RingOuter = 3000f;
 
@@ -23,10 +23,10 @@ namespace GoatDescent.EditorTools
             (74f + Mathf.Sin(z * .0091f) * 14f) * Mathf.Lerp(1f, .35f, EndMask(z));
 
         public static float RimHeight(float z) =>
-            208f + Mathf.Sin(z * .0053f + .4f) * 32f + Mathf.Sin(z * .0141f) * 12f + 112f * EndMask(z);
+            240f + Mathf.Sin(z * .0053f + .4f) * 64f + Mathf.Sin(z * .0141f) * 12f + 112f * EndMask(z);
 
         public static float BedLevel(float z) =>
-            Mathf.Lerp(-208f + Mathf.Sin(z * .0067f) * 22f, RimHeight(z) - 30f, EndMask(z));
+            Mathf.Lerp(-255f + Mathf.Sin(z * .0067f) * 22f, RimHeight(z) - 30f, EndMask(z));
 
         private static float EndMask(float z) => Mathf.SmoothStep(0f, .3f, Mathf.InverseLerp(960f, 1420f, Mathf.Abs(z)));
 
@@ -135,9 +135,9 @@ namespace GoatDescent.EditorTools
                     float z = (positions[i, j].z + positions[i + 1, j + 1].z) * .5f;
                     kind[i, j] = IsBed(x, z) ? (byte)2 : IsRock(x, z) && !IsShelf(x, z) ? (byte)0 : (byte)1;
                 }
-            var rockBatch = new FrozenRiftBatch(false);
-            var snowBatch = new FrozenRiftBatch(false);
-            var bedBatch = new FrozenRiftBatch(false);
+            var rockBatch = new FrozenRiftBatch(true);
+            var snowBatch = new FrozenRiftBatch(true);
+            var bedBatch = new FrozenRiftBatch(true);
             for (int j = 0; j < Grid; j++)
                 for (int i = 0; i < Grid; i++)
                 {
@@ -160,8 +160,8 @@ namespace GoatDescent.EditorTools
         {
             const int segments = 256;
             const int steps = 10;
-            var snowBatch = new FrozenRiftBatch(false);
-            var rockBatch = new FrozenRiftBatch(false);
+            var snowBatch = new FrozenRiftBatch(true);
+            var rockBatch = new FrozenRiftBatch(true);
             const float delta = Mathf.PI * 2f / segments;
             Vector3 Point(float angle, int step)
             {
@@ -173,9 +173,9 @@ namespace GoatDescent.EditorTools
                 float scale = inner / radius;
                 float baseHeight = (BaseAt(angle - delta, radius, scale) + BaseAt(angle, radius, scale)
                     + BaseAt(angle + delta, radius, scale)) / 3f + 6f;
-                float top = Mathf.Lerp(baseHeight + 8f, 445f, t);
-                float taper = Mathf.Lerp(1f, .5f, Mathf.Clamp01((t - .25f) / .75f));
-                float ridges = (Mathf.PerlinNoise(angle * 8.3f + 3.1f, 1.7f) - .5f) * 126f
+                float top = Mathf.Lerp(baseHeight + 8f, 740f, t);
+                float taper = Mathf.Lerp(1f, .85f, Mathf.Clamp01((t - .25f) / .75f));
+                float ridges = (Mathf.PerlinNoise(angle * 8.3f + 3.1f, 1.7f) - .5f) * 360f
                     + (Mathf.PerlinNoise(angle * 17.7f + 11.3f, 3.3f) - .5f) * 50f
                     + (Mathf.PerlinNoise(x * .0022f + 13f, z * .0022f + 17f) - .5f) * 56f;
                 float skirt = 3f * Mathf.Clamp01((1.5f - step) / 1.5f);

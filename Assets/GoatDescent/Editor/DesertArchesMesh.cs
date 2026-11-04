@@ -474,6 +474,8 @@ namespace GoatDescent.EditorTools
                 float pier = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.18f, .46f, fy));
                 float rib = Mathf.Sin(t * 20f + seed * 2.1f) * 2.4f * pier * t;
                 float grain = Mathf.Sin(z * .09f + t * 2.7f + seed + index * 1.13f) * .6f;
+                float fracture = (Mathf.PerlinNoise(index * .53f + seed, t * 4.3f) - .5f) * depth * .25f;
+                grain += Mathf.Sign(z) * fracture * Mathf.Sin(t * Mathf.PI);
                 float baseDark = Mathf.Lerp(.58f, 1f, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0f, crest * .45f, b.y)));
                 float vault = Mathf.Lerp(.68f, 1f, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.15f, 0f, t)));
                 float depthLight = Mathf.Lerp(.34f, 0f, Mathf.InverseLerp(-hz, hz, z));

@@ -17,7 +17,7 @@ namespace GoatDescent.EditorTools
         private const float RadScale = 1.15f;
         private const float HeightScale = 1.12f;
         private const int TerraceSides = 144;
-        private const int Grooves = 12;
+        private const int Grooves = 9;
         private const float CaveCeilingU = .6f;
         public const float PeakHeight = 440f;
         public const float WaterLevel = -4.5f;
@@ -126,7 +126,7 @@ namespace GoatDescent.EditorTools
         private static float SideAngle(int side) => side * Tau / Sides;
 
         private static float Shape(float angle) =>
-            1f + .05f * Mathf.Sin(angle * 2f + .8f) + .035f * Mathf.Sin(angle * 3f - 1.2f)
+            1f + .12f * Mathf.Sin(angle * 2f + .8f) + .07f * Mathf.Sin(angle * 3f - 1.2f)
             + .024f * Mathf.Sin(angle * 7f + 1.1f) + .013f * Mathf.Sin(angle * 13f - .7f)
             + .008f * Mathf.Sin(angle * 23f + 2.2f) + .006f * Mathf.Sin(angle * 31f - 2.6f)
             + .004f * Mathf.Sin(angle * 47f + .9f);
@@ -189,14 +189,14 @@ namespace GoatDescent.EditorTools
 
         private static float TiltAt(float y, float angle)
         {
-            float amp = 58f * Mathf.Pow(Mathf.Clamp01(y / 400f), 1.2f);
+            float amp = 76f * Mathf.Pow(Mathf.Clamp01(y / 400f), 1.2f);
             float phase = angle + y / 200f;
             return amp * (.7f * Mathf.Sin(phase + .6f) + .3f * Mathf.Sin(2f * phase - 1.1f));
         }
 
         private static float Flute(float angle, float height)
         {
-            float groove = Mathf.Pow(Mathf.Max(0f, Mathf.Sin(angle * Grooves + height * .002f)), 12f) * 26f;
+            float groove = Mathf.Pow(Mathf.Max(0f, Mathf.Sin(angle * Grooves + height * .002f)), 8f) * 38f;
             float jag = Mathf.Sin(angle * 33f + height * .01f) * 2.1f + Mathf.Sin(angle * 57f - height * .018f) * 1.2f;
             return -groove + jag;
         }

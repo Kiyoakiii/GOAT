@@ -8,7 +8,7 @@ namespace GoatDescent.EditorTools
     internal static class SkyBridgeMesh
     {
         public const float WaterLevel = 6f;
-        public const float ArchHalf = 240f;
+        public const float ArchHalf = 315f;
         private static readonly Color Rock = new Color(0f, 0f, 0f, 1f);
 
         public static float Center(float z) => Mathf.Sin(z * .0041f) * 13f + Mathf.Sin(z * .0113f + 1.7f) * 4.5f;
@@ -86,7 +86,7 @@ namespace GoatDescent.EditorTools
                 + Mathf.PerlinNoise(x * .019f + 9f, 3.3f) * 120f
                 + Mathf.Sin(x * .112f + 2.4f) * 9f
                 + Mathf.Sin(x * .047f + 5.1f) * 24f;
-            float twin = 300f * (Mathf.Exp(-Mathf.Pow((x - 210f) / 172f, 2f))
+            float twin = 180f * (Mathf.Exp(-Mathf.Pow((x - 210f) / 172f, 2f))
                 + Mathf.Exp(-Mathf.Pow((x + 210f) / 172f, 2f)));
             float sink = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(700f, 1000f, Mathf.Abs(x)));
             return Mathf.Lerp(crest + twin, TerrainHeight(x, 0f) - 50f, sink);
@@ -101,7 +101,7 @@ namespace GoatDescent.EditorTools
         {
             float a = Mathf.Abs(x) / ArchHalf;
             if (a >= 1f) return -40f;
-            return 340f * Mathf.Pow(1f - Mathf.Pow(a, 3.0f), .45f);
+            return 445f * Mathf.Pow(1f - Mathf.Pow(a, 3.0f), .45f);
         }
 
         public static float RidgeTop(float x, float z)

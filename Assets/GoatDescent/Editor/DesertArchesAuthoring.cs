@@ -282,6 +282,8 @@ namespace GoatDescent.EditorTools
             Debug.Log("ROUTE_SHOTS DesertArches count=" + count);
         }
 
+        public static Vector3[] ScenicRoute() => RouteWorld().ToArray();
+
         public static Vector3[] PlayRoute()
         {
             System.Func<Vector3, float> ground = point => { PlayGround(point, out float height); return height; };
